@@ -1,3 +1,7 @@
+'''An entry point for the Slack application.
+'''
+
+
 import os
 
 from slack_bolt import App
