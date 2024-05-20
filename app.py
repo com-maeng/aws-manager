@@ -1,11 +1,20 @@
 import os
 
 from slack_bolt import App
-
+import boto3
+from botocore.exceptions import ClientError
 
 app = App(
     token=os.getenv('AWS_MANAGER_SLACK_BOT_TOKEN'),
     signing_secret=os.getenv('AWS_MANAGER_SLACK_SIGNING_SECRET'),
+)
+
+# ec2
+ec2 = boto3.client(
+    'ec2',
+    aws_access_key_id=os.getenv('INSTANCE_MANAGER_AWS_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('INSTANCE_MANAGER_AWS_SECRET_ACCESS_KEY'),
+    region_name="ap-northeast-2"
 )
 
 
@@ -37,8 +46,24 @@ def start_instance(instance_id: str):
     ...
 
 
+def instance_management(status, user_instance_id):
+    '''
+    인스턴스 시작 혹은 종료 커맨드 사용시, 인스턴스 처리(시작 및 종료).
+    만약, 존재하지 않는 instance_id 일 때, error 처리 
+    '''
+
+    try:
+        if status == "start":
+            ec2.start_instances(InstanceIds=[user_instance_id], DryRun=False)
+        elif status == "end":
+            ec2.stop_instances(InstanceIds=[user_instance_id], DryRun=False)
+        return True
+    except ClientError:
+        return False
+
+
 @app.command('/start')
-def handle_start_command(ack, command):
+def handle_start_command(ack, say, command):
     '''인스턴스 시작 커맨드(/start) 처리.
 
     Args:
@@ -48,8 +73,18 @@ def handle_start_command(ack, command):
 
     ack()
 
+    user_name = command['user_name']
     user_id = command['user_id']
-    user_text = command['text']
+    instance_id = command['text']
+
+    # ec2 시작
+    flag_instance = instance_management('start', instance_id)
+
+    # ec2 확인후 응답
+    if flag_instance:
+        say(f"{user_name}님의 {instance_id}의 인스턴스를 시작합니다")
+    else:
+        say("옳지 않은 인스턴스 ID입니다. 다시 확인해서 작성해주세요")
 
     if get_track(user_id) != 'DE':
         ...
@@ -71,6 +106,30 @@ def handle_start_command(ack, command):
     # TODO: 금일 잔여량, 시작시간, 예정 종료 시간 정보 전송
 
     # TODO: 로그 적재
+
+
+@app.command('/end')
+def handle_end_command(ack, say, command):
+    '''인스턴스 시작 커맨드(/end) 처리.
+
+    Args:
+        ack: `ack()` utility function, which returns acknowledgement to the Slack servers.
+        command: An alias for payload in an `@app.command` listener.
+    '''
+
+    ack()
+
+    user_name = command['user_name']
+    instance_id = command['text']
+
+    # ec2 시작
+    flag_instance = instance_management('end', instance_id)
+
+    # ec2 확인후 응답
+    if flag_instance:
+        say(f"{user_name}님의 {instance_id}의 인스턴스를 종료합니다")
+    else:
+        say("옳지 않은 인스턴스 ID입니다. 다시 확인해서 작성해주세요")
 
 
 if __name__ == '__main__':
