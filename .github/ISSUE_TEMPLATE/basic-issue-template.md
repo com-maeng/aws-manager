@@ -1,6 +1,6 @@
 ---
 name: Basic issue template
-about: Describe this issue's purpose here.
+about: 기본 이슈 템플릿입니다.
 title: ''
 labels: ''
 assignees: ''
@@ -8,3 +8,4 @@ assignees: ''
 ---
 
 ## Description
+
