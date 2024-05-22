@@ -5,12 +5,17 @@
 import os
 
 from slack_bolt import App
+from slack_bolt.adapter.flask import SlackRequestHandler
+
+from flask import Flask, request
 
 
 app = App(
     token=os.getenv('AWS_MANAGER_SLACK_BOT_TOKEN'),
     signing_secret=os.getenv('AWS_MANAGER_SLACK_SIGNING_SECRET'),
 )
+flask_app = Flask(__name__)
+handler = SlackRequestHandler(app)
 
 
 def get_track(user_id: str):
@@ -77,5 +82,9 @@ def handle_start_command(ack, command):
     # TODO: 로그 적재
 
 
-if __name__ == '__main__':
-    app.start(port=int(os.getenv('AWS_MANAGER_DEV_SLACK_PORT')))
+@flask_app.route('/slack/events', methods=['POST'])
+def handle_slack_events():
+    '''Hanle Slack events within Flask.
+    '''
+
+    return handler.handle(request)
