@@ -10,3 +10,16 @@ CREATE TABLE student (
     email           VARCHAR(50)     UNIQUE NOT NULL
 )
 ;
+
+CREATE TYPE
+    request_type AS ENUM ('start', 'end')
+;
+
+CREATE TABLE slack_instance_request_log(
+    id                  SERIAL          PRIMARY KEY,
+    student_id          INT             NOT NULL REFERENCES student(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    instance_id         VARCHAR(25),
+    request_type        request_type,
+    request_time        TIMESTAMP       NOT NULL
+)
+;
