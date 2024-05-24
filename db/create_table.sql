@@ -28,7 +28,7 @@ CREATE TABLE slack_instance_request_log(
     instance_info_id    VARCHAR(20)     NOT NULL,
     request_type        request_type,
     request_time        TIMESTAMP       NOT NULL,
-    FOREIGN KEY(student_name)       REFERENCES student(id)          ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY(student_id)       REFERENCES student(id)          ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY(instance_info_id)   REFERENCES instance_info(id)    ON DELETE CASCADE ON UPDATE CASCADE
 )
 ;
