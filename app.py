@@ -1,4 +1,7 @@
 '''An entry point for the Slack application.
+
+Example:
+    $ gunicorn -w 2 --bind 127.0.0.1:4202 app:flask_app
 '''
 
 
