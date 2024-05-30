@@ -46,10 +46,10 @@ def insert_info(users_info: list[list[dict[str, str]]]):
     '''
 
     with psycopg.connect(  # pylint: disable=not-context-manager
-        host=os.getenv('AWS_MANAGER_DEV_DB'),
-        dbname=os.getenv('AWS_MANAGER_DEV_DB_NAME'),
-        user=os.getenv('AWS_MANAGER_DEV_DB_USER'),
-        password=os.getenv('AWS_MANAGER_DEV_DB_USER_PW'),
+        host=os.getenv('AWS_MANAGER_DB_HOST'),
+        dbname=os.getenv('AWS_MANAGER_DB_NAME'),
+        user=os.getenv('AWS_MANAGER_DB_USER'),
+        password=os.getenv('AWS_MANAGER_DB_PW'),
     ) as conn:
         with conn.cursor() as cur:
             cur.executemany(
@@ -72,9 +72,9 @@ if __name__ == '__main__':
     )
 
     de_users_id = get_users_id_from_group(
-        app, os.getenv('AWS_MANAGER_DE_GROUP_ID'))
+        app, os.getenv('AWS_MANAGER_SLACK_DE_GROUP_ID'))
     ds_users_id = get_users_id_from_group(
-        app, os.getenv('AWS_MANAGER_DS_GROUP_ID'))
+        app, os.getenv('AWS_MANAGER_SLACK_DS_GROUP_ID'))
 
     de_users_info = get_users_info(app, de_users_id, 'DE')
     ds_users_info = get_users_info(app, ds_users_id, 'DS')
