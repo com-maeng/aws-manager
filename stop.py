@@ -191,7 +191,7 @@ def insert_instance_request_log(student_id: str, instance_id: str, request_type:
 
 
 def check_right_user_instance(student_id):
-    '''사용자가 요청했던 instance id와 동일한지 확인.'''
+    '''사용자가 바로 이전에 요청했던 instance id와 동일한지 확인.'''
 
     with psycopg.connect(  # pylint: disable=not-context-manager
         host=os.getenv('AWS_MANAGER_DB'),
@@ -218,7 +218,7 @@ def check_right_user_instance(student_id):
     return pre_use_instance_id
 
 
-@app.command('/yj_stop')
+@app.command('/stop')
 def handle_stop_command(ack, say, command):
     '''인스턴스 중지 커맨드(/stop) 처리.'''
 
@@ -232,12 +232,12 @@ def handle_stop_command(ack, say, command):
         say('EC2를 사용 할 수 없는 사용자 입니다. 사용하고 싶으시면 문의 해주세요.')
         return False
     elif track != 'DE':
-        say('DS track은 아직 인스턴스를 사용할 수 없습니다')
+        say('DS track은 아직 인스턴스를 사용할 수 없습니다.')
         return False
 
     instance_state = get_instance_state(ec2, request_instance_id)
     if instance_state == 'error':
-        say('존재하지 않는 인스턴스 id 입니다. 인스턴스 id를 다시 확인해주세요')
+        say('존재하지 않는 인스턴스 id 입니다. 인스턴스 id를 다시 확인해주세요.')
         return False
     elif instance_state != 'running':
         say(f'인스턴스가 {instance_state} 상태입니다. 인스턴스는 running 상태일때만 종료할 수 있습니다.')
@@ -245,7 +245,7 @@ def handle_stop_command(ack, say, command):
 
     before_use_instance_id = check_right_user_instance(student_id)[0]
     if before_use_instance_id != request_instance_id:
-        say('이전에 시작을 요청한 instance id와 동일한 id가 아닙니다. 확인해주세요')
+        say('이전에 시작을 요청한 instance id와 동일한 id가 아닙니다. 확인해주세요.')
         return False
 
     ec2.stop_instances(InstanceIds=[request_instance_id], DryRun=False)
@@ -260,7 +260,7 @@ def handle_stop_command(ack, say, command):
         f'''
 {request_instance_id}를 종료합니다.
 인스턴스 종료 시간 : {now.strftime('%Y-%m-%d %H시 %M분')}
-오늘의 남은 잔여량 :  {limit_hours}시간 {limit_minutes}분
+오늘의 남은 잔여 시간 : {limit_hours}시간 {limit_minutes}분
         '''
     )
 
