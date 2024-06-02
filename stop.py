@@ -52,7 +52,7 @@ def get_user_info(user_id: str) -> tuple:
                 WHERE 
                     slack_id = %s
                 ;
-                '''
+            '''
             cur.execute(query, (user_id,))
             user_info = cur.fetchone()
 
@@ -212,9 +212,11 @@ def check_right_user_instance(student_id):
                     request_time DESC 
                 LIMIT  1
                 ;
-                '''
+            '''
+
             cur.execute(query, (student_id,))
             pre_use_instance_id = cur.fetchone()
+
     return pre_use_instance_id
 
 
@@ -226,34 +228,37 @@ def handle_stop_command(ack, say, command):
 
     user_id = command['user_id']
     request_instance_id = command['text'].split()[-1]
-
     track, student_id = get_user_info(user_id)
+    before_use_instance_id = check_right_user_instance(student_id)
+    instance_state = get_instance_state(ec2, request_instance_id)
+
     if track is None:
         say('EC2를 사용 할 수 없는 사용자 입니다. 사용하고 싶으시면 문의 해주세요.')
         return False
-    elif track != 'DE':
+
+    if track != 'DE':
         say('DS track은 아직 인스턴스를 사용할 수 없습니다.')
         return False
 
-    instance_state = get_instance_state(ec2, request_instance_id)
     if instance_state == 'error':
         say('존재하지 않는 인스턴스 id 입니다. 인스턴스 id를 다시 확인해주세요.')
         return False
-    elif instance_state != 'running':
+
+    if instance_state != 'running':
         say(f'인스턴스가 {instance_state} 상태입니다. 인스턴스는 running 상태일때만 종료할 수 있습니다.')
         return False
 
-    before_use_instance_id = check_right_user_instance(student_id)
     if before_use_instance_id is None:
         say("이전에 /start 요청을 하신적이 없어, /stop 요청을 사용하실 수 없습니다.")
         return False
-    elif before_use_instance_id != request_instance_id:
+
+    if before_use_instance_id[0] != request_instance_id:
         say('이전에 시작을 요청한 instance id와 동일한 id가 아닙니다. 확인해주세요.')
         return False
 
     ec2.stop_instances(InstanceIds=[request_instance_id], DryRun=False)
-    insert_instance_request_log(student_id, request_instance_id, 'stop')
 
+    insert_instance_request_log(student_id, request_instance_id, 'stop')
     instance_use_log = get_today_instance_request_log(user_id)
     limit_time = get_remaining_instance_limit(instance_use_log)
     limit_hours, limit_minutes, _ = str(limit_time).split(':')
