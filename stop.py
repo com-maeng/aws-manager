@@ -243,8 +243,11 @@ def handle_stop_command(ack, say, command):
         say(f'인스턴스가 {instance_state} 상태입니다. 인스턴스는 running 상태일때만 종료할 수 있습니다.')
         return False
 
-    before_use_instance_id = check_right_user_instance(student_id)[0]
-    if before_use_instance_id != request_instance_id:
+    before_use_instance_id = check_right_user_instance(student_id)
+    if before_use_instance_id is None:
+        say("이전에 /start 요청을 하신적이 없어, /stop 요청을 사용하실 수 없습니다.")
+        return False
+    elif before_use_instance_id != request_instance_id:
         say('이전에 시작을 요청한 instance id와 동일한 id가 아닙니다. 확인해주세요.')
         return False
 
