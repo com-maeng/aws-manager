@@ -9,7 +9,6 @@ import os
 from datetime import datetime, timedelta
 
 from pytz import timezone
-import holidays
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 import boto3
@@ -17,6 +16,7 @@ import botocore.exceptions
 from flask import Flask, request
 import psycopg
 
+from manage_usage_time import InstanceUsageManager
 
 app = App(
     token=os.getenv('AWS_MANAGER_SLACK_BOT_TOKEN'),
@@ -72,94 +72,6 @@ def get_instance_state(ec2: boto3.client, instance_id: str) -> str:
         return 'error'
 
 
-def get_today_instance_request_log(user_id: str) -> list:
-    '''사용자의 오늘 인스턴스 요청 정보를 모두 반환.'''
-
-    with psycopg.connect(  # pylint: disable=not-context-manager
-        host=os.getenv('AWS_MANAGER_DB'),
-        dbname=os.getenv('AWS_MANAGER_DB_NAME'),
-        user=os.getenv('AWS_MANAGER_DB_USER'),
-        password=os.getenv('AWS_MANAGER_DB_USER_PW'),
-    ) as conn:
-        with conn.cursor() as cur:
-            query = """
-                    SELECT 
-                        student_id
-                        , instance_id
-                        , request_type
-                        , request_time
-                    FROM 
-                        slack_instance_request_log AS log
-                    JOIN (
-                        SELECT 
-                            id
-                        FROM 
-                            student
-                        WHERE 
-                            slack_id = %s
-                    )  AS s
-                    ON 
-                        log.student_id = s.id
-                    WHERE 
-                        request_time::DATE = CURRENT_DATE
-                    ORDER BY 
-                        request_time
-                    ;
-                    """
-            cur.execute(query, (user_id,))
-            use_logs = cur.fetchall()
-
-    return use_logs
-
-
-def get_throshold_time() -> datetime:
-    '''인스턴스 일별 할당량 시간 계산 함수.'''
-
-    year = datetime.now().year
-    kr_holidays = holidays.country_holidays('KR', years=year)
-    today = datetime.now(timezone('Asia/Seoul')).date()
-
-    if today in kr_holidays or today.weekday() >= 5:
-        threshold_time = 12
-    else:
-        threshold_time = 6
-
-    return threshold_time
-
-
-def get_remaining_instance_limit(use_logs: list) -> datetime:
-    '''사용자의 잔여 인스턴스 사용 가능 시간을 반환.'''
-
-    today = datetime.now(timezone('Asia/Seoul'))
-    delta_time = timedelta()
-    midnight_time = datetime.combine(
-        today.date(), datetime.min.time())
-
-    for i, log in enumerate(use_logs):
-        request_type_log = log[2]
-        request_time_log = log[-1]
-
-        if i == 0 and request_type_log == 'stop':  # 새벽 종료시 사용 시간 계산
-            delta_time += (request_time_log - midnight_time)
-
-        # 시스템 로직이 인스턴스 종료 시, 사용 시간 계산
-        elif i == len(use_logs) - 1 and request_type_log == 'start':
-            delta_time += (today -
-                           request_time_log.astimezone(timezone('Asia/Seoul')))
-
-        elif request_type_log == 'start':  # start ~ stop의 시간 계산
-            next_log = use_logs[i+1]
-            next_request_time = next_log[-1]
-            next_request_type = next_log[2]
-            if next_request_type == 'stop':
-                delta_time += (next_request_time - request_time_log)
-
-    threshold_time = get_throshold_time()
-    limit_time = timedelta(hours=threshold_time) - delta_time
-
-    return limit_time
-
-
 def insert_instance_request_log(student_id: str, instance_id: str, request_type: str) -> None:
     '''인스턴스 요청 로그 저장.'''
 
@@ -190,7 +102,7 @@ def insert_instance_request_log(student_id: str, instance_id: str, request_type:
             conn.commit()
 
 
-@app.command('/start')
+@app.command('/yj_start')
 def handle_start_command(ack, say, command):
     '''인스턴스 시작 커맨드(/start) 처리.
 
@@ -203,6 +115,8 @@ def handle_start_command(ack, say, command):
 
     user_id = command['user_id']
     request_instance_id = command['text'].strip()
+
+    timer = InstanceUsageManager()
 
     track, student_id = get_user_info(user_id)
     if track is None:
@@ -220,8 +134,7 @@ def handle_start_command(ack, say, command):
         say(f"인스턴스가 {instance_state} 상태입니다. 인스턴스는 중지 상태일때만 시작할 수 있습니다.")
         return False
 
-    instance_use_log = get_today_instance_request_log(user_id)
-    limit_time = get_remaining_instance_limit(instance_use_log)
+    limit_time = timer.get_remaining_time(request_instance_id)
 
     if limit_time <= timedelta():  # (일일 할당 시간 - 사용시간)이 0시간 이하인지 확인
         say("아쉽지만 오늘의 사용시간을 초과하였습니다.")
