@@ -1,8 +1,7 @@
-'''인스턴스 사용량 초기화 및 할당량 초과 인스턴스 중지 기능 구현. '''
+'''인스턴스 사용량 초기화 및 할당량 초과 인스턴스 중지 기능 구현 모듈. '''
 
 import os
-from datetime import datetime, timedelta
-from pytz import timezone
+from datetime import timedelta
 import psycopg
 from slack_bolt import App
 import boto3
@@ -11,7 +10,7 @@ from manage_usage_time import InstanceUsageManager
 
 
 class InstancePolice():
-    '''인스턴스 사용량 초기화 및 할당량 초과 인스턴스 중지 기능 구현.'''
+    '''인스턴스 사용량 초기화 및 할당량 초과 인스턴스 중지, 알람 기능을 구현하는 클레스.'''
 
     def __init__(self) -> None:
         self.ec2 = boto3.client(
@@ -45,15 +44,6 @@ class InstancePolice():
 
         return running_instance
 
-    def insert_log_at_midnight(self):
-        '''자정마다 사용중인 인스턴스들을 system log에 적재 기능 구현.'''
-
-        running_instance = self.get_instance_running_list()
-        # print(running_instance)
-
-        for instance_id in running_instance:
-            self.timer.insert_system_logs(instance_id, 'start')
-
     def identify_instance_users(self, instance_id):
         '''특정 인스턴스를 사용하는 교육생을 식별.'''
 
@@ -83,6 +73,7 @@ class InstancePolice():
                         '''
                 cur.execute(query, (instance_id,))
                 slack_id = cur.fetchall()
+
         if slack_id != []:
             slack_id = slack_id[-1][0]
 
@@ -113,12 +104,5 @@ class InstancePolice():
 
 if __name__ == "__main__":
     instance_police = InstancePolice()
-    midnight_time = datetime.combine(
-        datetime.now(timezone('Asia/Seoul')),
-        datetime.min.time()
-    )
-
-    if datetime.now() == midnight_time:
-        instance_police.insert_log_at_midnight()
 
     instance_police.auto_stop_exceeded_instance()
