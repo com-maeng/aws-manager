@@ -103,6 +103,6 @@ class InstancePolice():
 
 
 if __name__ == "__main__":
-    instance_police = InstancePolice()
 
+    instance_police = InstancePolice()
     instance_police.auto_stop_exceeded_instance()
