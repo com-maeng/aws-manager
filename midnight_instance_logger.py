@@ -1,3 +1,6 @@
+'''자정마다 실행시킬 상태 반영 로직 구현하는 모듈.'''
+
+
 from instance_police import InstancePolice
 
 

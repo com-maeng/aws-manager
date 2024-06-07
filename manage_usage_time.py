@@ -1,5 +1,6 @@
 '''인스턴스 사용량을 관리하는 모듈'''
 
+
 import os
 
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ class InstanceUsageManager:
         self.midnight_time = datetime.combine(
             self.today_date,
             datetime.min.time()
-        )
+        ).astimezone(timezone('Asia/Seoul'))
         self.throshold_time = self.get_throshold_time()
 
     def get_throshold_time(self) -> timedelta:
