@@ -66,7 +66,7 @@ class InstancePolice():
                                 slack_instance_request_log
                             WHERE 
                                 instance_id = %s
-                            ) AS r_log
+                        ) AS r_log
                         ON 
                             s.id = r_log.student_id
                         ;

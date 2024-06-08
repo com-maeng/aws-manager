@@ -18,9 +18,9 @@ class InstanceUsageManager:
             self.today_date,
             datetime.min.time()
         ).astimezone(timezone('Asia/Seoul'))
-        self.throshold_time = self.get_throshold_time()
+        self.throshold_time = self.get_threshold_time()
 
-    def get_throshold_time(self) -> timedelta:
+    def get_threshold_time(self) -> timedelta:
         '''공휴일과 주말을 기준으로 인스턴스의 일별 할당 시간을 계산.'''
 
         year = self.today_date.year

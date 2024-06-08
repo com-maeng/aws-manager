@@ -102,7 +102,7 @@ def insert_instance_request_log(student_id: str, instance_id: str, request_type:
             conn.commit()
 
 
-@app.command('/yj_start')
+@app.command('/start')
 def handle_start_command(ack, say, command):
     '''인스턴스 시작 커맨드(/start) 처리.
 
@@ -116,7 +116,7 @@ def handle_start_command(ack, say, command):
     user_id = command['user_id']
     request_instance_id = command['text'].strip()
 
-    timer = InstanceUsageManager()
+    manager = InstanceUsageManager()
 
     track, student_id = get_user_info(user_id)
     if track is None:
@@ -134,7 +134,7 @@ def handle_start_command(ack, say, command):
         say(f"인스턴스가 {instance_state} 상태입니다. 인스턴스는 중지 상태일때만 시작할 수 있습니다.")
         return False
 
-    limit_time = timer.get_remaining_time(request_instance_id)
+    limit_time = manager.get_remaining_time(request_instance_id)
 
     if limit_time <= timedelta():  # (일일 할당 시간 - 사용시간)이 0시간 이하인지 확인
         say("아쉽지만 오늘의 사용시간을 초과하였습니다.")
