@@ -2,11 +2,10 @@
 
 
 import os
-
 from datetime import datetime, timedelta
-from pytz import timezone
+
 import holidays
-import psycopg
+from pytz import timezone
 
 
 class InstanceUsageManager:
@@ -19,6 +18,7 @@ class InstanceUsageManager:
             datetime.min.time()
         ).astimezone(timezone('Asia/Seoul'))
         self.throshold_time = self.get_threshold_time()
+        # self.timer = InstanceUsageManager()  # TODO
 
     def get_threshold_time(self) -> timedelta:
         '''공휴일과 주말을 기준으로 인스턴스의 일별 할당 시간을 계산.'''
@@ -124,3 +124,78 @@ class InstanceUsageManager:
         total_usage_time = self.calculate_instance_usage(instance_id)
 
         return self.throshold_time - total_usage_time
+
+    def get_instance_running_list(self) -> list:
+        '''running 상태의 instance id들을 반환.'''
+
+        running_instance = []
+        reservations = self.ec2.describe_instances(
+            Filters=[
+                {
+                    "Name": "instance-state-name",
+                    "Values": ["running"]
+                }
+            ]
+        )['Reservations']
+
+        for reservation in reservations:
+            running_instance.append(reservation['Instances'][0]['InstanceId'])
+
+        return running_instance
+
+    def identify_instance_users(self, instance_id):
+        '''특정 인스턴스를 사용하는 교육생을 식별.'''
+
+        with psycopg.connect(  # pylint: disable=not-context-manager
+            host=os.getenv('AWS_MANAGER_DB'),
+            dbname=os.getenv('AWS_MANAGER_DB_NAME'),
+            user=os.getenv('AWS_MANAGER_DB_USER'),
+            password=os.getenv('AWS_MANAGER_DB_USER_PW'),
+        ) as conn:
+            with conn.cursor() as cur:
+                query = '''
+                        SELECT 
+                            DISTINCT slack_id
+                        FROM 
+                            student AS s 
+                        JOIN (
+                            SELECT 
+                                DISTINCT student_id
+                            FROM 
+                                slack_instance_request_log
+                            WHERE 
+                                instance_id = %s
+                        ) AS r_log
+                        ON 
+                            s.id = r_log.student_id
+                        ;
+                        '''
+                cur.execute(query, (instance_id,))
+                slack_id = cur.fetchall()
+
+        if slack_id != []:
+            slack_id = slack_id[-1][0]
+
+        return slack_id
+
+    def stop_quota_exceeded_instance(self):
+        '''할당 사용 시간을 넘긴 인스턴스들 자동 종료 기능 구현.'''
+
+        running_instance = self.get_instance_running_list()
+
+        for instance_id in running_instance:
+            remain_time = self.timer.get_remaining_time(instance_id)
+
+            if remain_time <= timedelta():
+                slack_id = self.identify_instance_users(instance_id)
+
+                self.ec2.stop_instances(
+                    InstanceIds=[instance_id], DryRun=False)
+
+                self.timer.insert_system_logs(instance_id, 'stop')
+
+                if slack_id != []:
+                    self.app.client.chat_postMessage(
+                        channel=slack_id,
+                        text=f"사용시간이 만료되어 {instance_id} 인스턴스가 자동 종료됩니다. "
+                    )

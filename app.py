@@ -1,166 +1,181 @@
-'''An entry point for the Slack application.
+'''An entry point of the Flask application.
 
 Example:
-    $ gunicorn -w 2 --bind 127.0.0.1:4202 app:flask_app
+    $ gunicorn --workers 2 --bind 127.0.0.1:4202 app:app
 '''
 
 
-import os
+import logging
 from datetime import datetime, timedelta
 
-from pytz import timezone
-from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
-import boto3
-import botocore.exceptions
 from flask import Flask, request
-import psycopg
 
-from manage_usage_time import InstanceUsageManager
+from pytz import timezone
 
-app = App(
-    token=os.getenv('AWS_MANAGER_SLACK_BOT_TOKEN'),
-    signing_secret=os.getenv('AWS_MANAGER_SLACK_SIGNING_SECRET'),
+from client.slack_client import SlackClient
+from client.aws_client import EC2Client
+from client.psql_client import PSQLClient
+from client.instance_usage_manager import InstanceUsageManager
+
+
+# Set up a root logger
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
 )
-ec2 = boto3.client(
-    'ec2',
-    aws_access_key_id=os.getenv('AWS_MANAGER_AWS_ACCESS_KEY'),
-    aws_secret_access_key=os.getenv(
-        'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
-    region_name='ap-northeast-2'
-)
-flask_app = Flask(__name__)
-handler = SlackRequestHandler(app)
+
+ec2_client = EC2Client()
+slack_client = SlackClient()
+psql_client = PSQLClient()
+instance_usage_manager = InstanceUsageManager()
+
+app = Flask(__name__)
+slack_app = slack_client.app
+slack_req_handler = SlackRequestHandler(slack_app)
 
 
-def get_user_info(user_id: str) -> tuple:
-    '''사용자의 정보를 반환.'''
+@slack_app.command('/stop')
+def handle_stop_command(ack, say, command) -> bool:
+    '''인스턴스 중지 커맨드(/stop)를 처리합니다.'''
 
-    with psycopg.connect(  # pylint: disable=not-context-manager
-        host=os.getenv('AWS_MANAGER_DB'),
-        dbname=os.getenv('AWS_MANAGER_DB_NAME'),
-        user=os.getenv('AWS_MANAGER_DB_USER'),
-        password=os.getenv('AWS_MANAGER_DB_USER_PW'),
-    ) as conn:
-        with conn.cursor() as cur:
-            query = """
-                SELECT 
-                    track
-                    , id
-                FROM 
-                    student
-                WHERE 
-                    slack_id = %s
-                ;
-                """
-            cur.execute(query, (user_id,))
-            user_info = cur.fetchone()
+    ack()  # 3초 이내 응답 필요
 
-    return (None, None) if user_info is None else user_info
+    # 사용자 입력값의 가장 마지막에 인스턴스 ID가 위치한다고 가정
+    instance_id = command['text'].split()[-1]
 
+    slack_id = command['user_id']
+    track, student_id = psql_client.get_track_and_student_id(slack_id)
+    instance_state = ec2_client.get_instance_state(instance_id)
 
-def get_instance_state(ec2: boto3.client, instance_id: str) -> str:
-    '''인스턴스의 상태 정보를 반환.'''
+    if track != 'DE':
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info('DE 트랙 외 교육생의 `/stop` 요청 | slack_id: %s', slack_id)
 
-    try:
-        reservations = ec2.describe_instances(
-            InstanceIds=[instance_id]
-        )['Reservations']
-        instance_status = reservations[0]['Instances'][0]['State']['Name']
-        return instance_status
-    except botocore.exceptions.ClientError:
-        return 'error'
+    if instance_state != 'running':
+        say('인스턴스가 시작(running) 상태일 때만 중지할 수 있습니다.')
+        logging.info(
+            '시작 상태가 아닌 인스턴스 `/stop` 요청 | 인스턴스 상태: %s',
+            instance_state
+        )
 
-
-def insert_instance_request_log(student_id: str, instance_id: str, request_type: str) -> None:
-    '''인스턴스 요청 로그 저장.'''
-
-    with psycopg.connect(  # pylint: disable=not-context-manager
-        host=os.getenv('AWS_MANAGER_DB'),
-        dbname=os.getenv('AWS_MANAGER_DB_NAME'),
-        user=os.getenv('AWS_MANAGER_DB_USER'),
-        password=os.getenv('AWS_MANAGER_DB_USER_PW'),
-    ) as conn:
-        with conn.cursor() as cur:
-            insert_query = """
-                            INSERT INTO
-                                slack_instance_request_log (
-                                    student_id
-                                    , instance_id
-                                    , request_type
-                                    , request_time
-                                )
-                            VALUES
-                                (%s, %s, %s, %s)
-                            ;
-                            """
-            cur.execute(insert_query,
-                        (student_id, instance_id, request_type, str(
-                            datetime.now(timezone('Asia/Seoul'))))
-                        )
-
-            conn.commit()
-
-
-@app.command('/start')
-def handle_start_command(ack, say, command):
-    '''인스턴스 시작 커맨드(/start) 처리.
-
-    Args:
-        ack: `ack()` utility function, which returns acknowledgement to the Slack servers.
-        command: An alias for payload in an `@app.command` listener.
-    '''
-
-    ack()
-
-    user_id = command['user_id']
-    request_instance_id = command['text'].strip()
-
-    manager = InstanceUsageManager()
-
-    track, student_id = get_user_info(user_id)
-    if track is None:
-        say("EC2를 사용 할 수 없는 사용자 입니다. 사용하고 싶으시면 문의 해주세요.")
-        return False
-    elif track != 'DE':
-        say("DS track은 아직 인스턴스를 사용할 수 없습니다")
         return False
 
-    instance_state = get_instance_state(ec2, request_instance_id)
-    if instance_state == 'error':
-        say("존재하지 않는 인스턴스 id 입니다. 인스턴스 id를 다시 확인해주세요")
-        return False
-    elif instance_state != "stopped":
-        say(f"인스턴스가 {instance_state} 상태입니다. 인스턴스는 중지 상태일때만 시작할 수 있습니다.")
-        return False
-
-    limit_time = manager.get_remaining_time(request_instance_id)
-
-    if limit_time <= timedelta():  # (일일 할당 시간 - 사용시간)이 0시간 이하인지 확인
-        say("아쉽지만 오늘의 사용시간을 초과하였습니다.")
-        return False
-
-    ec2.start_instances(InstanceIds=[request_instance_id], DryRun=False)
-
-    limit_hours, limit_minutes, _ = str(limit_time).split(":")
-    now = datetime.now()
-
-    say(
-        f"""
-{request_instance_id}를 시작합니다.
-오늘의 잔여량:  {limit_hours}시간 {limit_minutes}분 
-인스턴스 시작 시간: {now.strftime('%Y-%m-%d %H시 %M분')}
-인스턴스 최대 사용 시간: {(now + limit_time).strftime('%Y-%m-%d %H시 %M분')}
-[인스턴스 사용 시간은 매일 자정에 재할당되는 점 참고해서 사용해주세요.]
-        """
+    latest_started_instance_id = psql_client.get_latest_started_instance_id(
+        student_id
     )
 
-    insert_instance_request_log(student_id, request_instance_id, "start")
+    if latest_started_instance_id != instance_id:
+        if latest_started_instance_id is None:
+            say('금일 시작 요청을 한 인스턴스가 없습니다.')
+            logging.info(
+                '금일 시작 요청이 없었던에 대한 인스턴스 `/stop` 요청 | 인스턴스 ID: %s',
+                instance_id
+            )
+        else:
+            say('직전에 시작 요청을 했던 인스턴스만 중지할 수 있습니다.')
+            logging.info(
+                '직전에 시작을 요청한 인스턴스와 다른 인스턴에 대한 인스턴스 `/stop` 요청 | 인스턴스 ID: %s',
+                instance_id
+            )
 
+        return False
 
-@flask_app.route('/slack/events', methods=['POST'])
-def handle_slack_events():
-    '''Hanle Slack events within Flask.
+    ec2_client.stop_instance(instance_id)
+
+    remaining_time = instance_usage_manager.get_remaining_time(
+        instance_id
+    )
+    remain_hours, remain_minutes, _ = str(remaining_time).split(':')
+    now = datetime.now(timezone('Asia/Seoul'))
+    msg = f'''
+{instance_id}를 종료했습니다.
+
+- 오늘의 잔여 할당량: {remain_hours}시간 {remain_minutes}분 
+- 인스턴스 종료 시간: {now.strftime('%Y-%m-%d %H:%M분')}
+
+*인스턴스 사용량 초기화는 매일 자정에 진행됩니다.*
     '''
 
-    return handler.handle(request)
+    say(msg)
+    psql_client.insert_instance_request_log(
+        student_id,
+        instance_id,
+        'stop',
+        str(now)
+    )
+
+    return True
+
+
+@slack_app.command('/start')
+def handle_start_command(ack, say, command) -> bool:
+    '''인스턴스 시작 커맨드(/start)를 처리합니다.'''
+
+    ack()  # 3초 이내 응답 필요
+
+    # 사용자 입력값의 가장 마지막에 인스턴스 ID가 위치한다고 가정
+    instance_id = command['text'].split()[-1]
+
+    slack_id = command['user_id']
+    track, student_id = psql_client.get_track_and_student_id(slack_id)
+    instance_state = ec2_client.get_instance_state(instance_id)
+
+    if track != 'DE':
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
+        logging.info('DE 트랙 외 교육생 `/start` 요청 | slack_id: %s', slack_id)
+
+        return False
+
+    if instance_state != 'stopped':
+        say('인스턴스가 중지(stopped) 상태일 때만 시작할 수 있습니다.')
+        logging.info(
+            '중지 상태가 아닌 인스턴스 `/start` 요청 | 인스턴스 상태: %s',
+            instance_state
+        )
+
+        return False
+
+    remaining_time = instance_usage_manager.get_remaining_time(
+        instance_id
+    )
+
+    if remaining_time <= timedelta():  # (일일 할당량 - 사용시간) <= 0
+        say('인스턴스 사용 할당량을 초과했습니다.')
+        logging.info(
+            '인스턴스 사용 할당량 초과 상태에서 `/start` 요청 | slack_id: %s',
+            slack_id
+        )
+
+        return False
+
+    ec2_client.start_instance(instance_id)
+
+    remain_hours, remain_minutes, _ = str(remaining_time).split(":")
+    now = datetime.now(timezone('Asia/Seoul'))
+    msg = f'''
+{instance_id}를 시작했습니다.
+
+- 오늘의 잔여 할당량: {remain_hours}시간 {remain_minutes}분 
+- 인스턴스 시작 시간: {now.strftime('%Y-%m-%d %H:%M분')}
+- 인스턴스 최대 사용 시간: {(now + remaining_time).strftime('%Y-%m-%d %H:%M분')}
+
+*인스턴스 사용량 초기화는 매일 자정에 진행됩니다.*
+    '''
+
+    say(msg)
+    psql_client.insert_instance_request_log(
+        student_id,
+        instance_id,
+        'start',
+        str(now)
+    )
+
+    return True
+
+
+@app.route('/slack/events', methods=['POST'])
+def handle_slack_events():
+    '''슬랙에서 송신된 이벤트 관련 request를 처리합니다.'''
+
+    return slack_req_handler.handle(request)
