@@ -45,12 +45,21 @@ def handle_stop_command(ack, say, command) -> bool:
     instance_id = command['text'].split()[-1]
 
     slack_id = command['user_id']
-    track, student_id = psql_client.get_track_and_student_id(slack_id)
     instance_state = ec2_client.get_instance_state(instance_id)
+
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+    except ValueError:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info('교육생이 아닌 사용자의 `/stop` 요청 | slack_id: %s', slack_id)
+
+        return False
 
     if track != 'DE':
         say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
         logging.info('DE 트랙 외 교육생의 `/stop` 요청 | slack_id: %s', slack_id)
+        
+        return False
 
     if instance_state != 'running':
         say('인스턴스가 시작(running) 상태일 때만 중지할 수 있습니다.')
@@ -118,8 +127,15 @@ def handle_start_command(ack, say, command) -> bool:
     instance_id = command['text'].split()[-1]
 
     slack_id = command['user_id']
-    track, student_id = psql_client.get_track_and_student_id(slack_id)
     instance_state = ec2_client.get_instance_state(instance_id)
+
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+    except ValueError:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
+        logging.info('교육생이 아닌 사용자의 `/start` 요청 | slack_id: %s', slack_id)
+
+        return False
 
     if track != 'DE':
         say('현재는 DE 트랙 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
