@@ -22,7 +22,8 @@ from client.instance_usage_manager import InstanceUsageManager
 # Set up a root logger
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[logging.FileHandler('app.log', mode='a')]
 )
 
 ec2_client = EC2Client()
@@ -58,7 +59,7 @@ def handle_stop_command(ack, say, command) -> bool:
     if track != 'DE':
         say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
         logging.info('DE 트랙 외 교육생의 `/stop` 요청 | slack_id: %s', slack_id)
-        
+
         return False
 
     if instance_state != 'running':
