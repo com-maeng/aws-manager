@@ -24,7 +24,7 @@ if __name__ == "__main__":
     psql_client = PSQLClient()
 
     end_time = datetime.now(pytz.utc)
-    start_time = end_time - timedelta(days=10)
+    start_time = end_time - timedelta(hours=1)
 
     runinstance_event_list = cloudtrail_client.get_runinstance_events(
         start_time, end_time)
