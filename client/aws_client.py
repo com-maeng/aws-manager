@@ -3,6 +3,7 @@
 
 import os
 import logging
+from datetime import datetime
 from typing import Optional
 
 import boto3
@@ -143,7 +144,7 @@ class EC2Client:
 
 
 class CloudTrailClient:
-    '''CloudTrail 클라이언트입니다.'''
+    '''CloudTrail 클라이언트로 인스턴스의 소유자 정보 확인하는 기능을 제공합니다.'''
 
     def __init__(self):
         self.client = boto3.client(
@@ -156,8 +157,8 @@ class CloudTrailClient:
 
     def get_runinstance_events(
         self,
-        start_time,
-        end_time,
+        start_time: datetime,
+        end_time: datetime,
     ) -> list[dict]:
         ''' 지정된 시간 범위에 생성된 Runinstances 로그들을 추출합니다.'''
 

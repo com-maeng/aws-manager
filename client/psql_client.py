@@ -59,6 +59,7 @@ class PSQLClient:
                 student (name, slack_id, track, email)
             VALUES
                 (%(name)s, %(slack_id)s, %(track)s, %(email)s)
+            ;
         '''
 
         self._execute_query(query, (users_info,), many=True)
@@ -142,11 +143,14 @@ class PSQLClient:
             self,
             owner_info_list: list[tuple]
     ) -> None:
-        '''사용자의 instance id 소유 정보를 db에 저장합니다.'''
+        '''사용자의 instance 소유 정보를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO
-                ownership_info (iam_name, instance_id)
+                ownership_info (
+                    iam_username
+                    , instance_id
+                )
             VALUES
                 (%s, %s)
             ;
@@ -158,11 +162,12 @@ class PSQLClient:
             self,
             instance_id_list: list
     ) -> list[tuple]:
-        '''주어진 인스턴스 ID가 DB에 적재되어 있는지 확인합니다.'''
+        '''주어진 인스턴스가 DB에 적재되어 있는지 확인합니다.'''
 
         query = '''
             SELECT
-                iam_name, instance_id
+                iam_username
+                , instance_id
             FROM
                 ownership_info
             WHERE

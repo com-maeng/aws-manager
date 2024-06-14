@@ -24,7 +24,7 @@ if __name__ == "__main__":
     psql_client = PSQLClient()
 
     end_time = datetime.now(pytz.utc)
-    start_time = end_time - timedelta(hours=1)
+    start_time = end_time - timedelta(days=10)
 
     runinstance_event_list = cloudtrail_client.get_runinstance_events(
         start_time, end_time)
@@ -32,8 +32,9 @@ if __name__ == "__main__":
         runinstance_event_list)
 
     new_instance_id = [info[1] for info in owner_info]
-    exist_instance_id = psql_client.check_exisited_instance_id(
+    exist_instance_id = psql_client.check_existed_instance_id(
         new_instance_id)
     final_onwer_info = list(set(owner_info) - set(exist_instance_id))
 
-    psql_client.insert_into_ownership(final_onwer_info)
+    if final_onwer_info:
+        psql_client.insert_into_ownership(final_onwer_info)
