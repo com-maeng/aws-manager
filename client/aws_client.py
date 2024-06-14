@@ -140,3 +140,67 @@ class EC2Client:
                     instance_id,
                     e
                 )
+
+
+class CloudTrailClient:
+    '''CloudTrail 클라이언트입니다.'''
+
+    def __init__(self):
+        self.client = boto3.client(
+            'cloudtrail',
+            aws_access_key_id=os.getenv('AWS_MANAGER_AWS_ACCESS_KEY'),
+            aws_secret_access_key=os.getenv(
+                'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
+            region_name='ap-northeast-2',
+        )
+
+    def get_runinstance_events(
+        self,
+        start_time,
+        end_time,
+    ) -> list[dict]:
+        ''' 지정된 시간 범위에 생성된 Runinstances 로그들을 추출합니다.'''
+
+        runinstance_events = []
+        response = self.client.lookup_events(
+            LookupAttributes=[
+                {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
+            ],
+            StartTime=start_time,
+            EndTime=end_time,
+            MaxResults=50,
+        )
+        runinstance_events.extend(response['Events'])
+
+        while 'NextToken' in response:
+            response = self.client.lookup_events(
+                LookupAttributes=[
+                    {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
+                ],
+                StartTime=start_time,
+                EndTime=end_time,
+                MaxResults=50,
+                NextToken=response['NextToken']
+            )
+            runinstance_events.extend(response['Events'])
+
+        return runinstance_events
+
+    def get_instance_owner_info(
+        self,
+        runinstance_events: list[dict]
+    ) -> list[dict]:
+        '''Log들 중 instance id와 instance의 소유권 정보를 추출'''
+
+        owner_info_list = []
+
+        for event in runinstance_events:
+            user_name = event['Username']
+            for resource in event['Resources']:
+                if resource['ResourceType'] == 'AWS::EC2::Instance':
+                    instance_id = resource['ResourceName']
+                    break
+
+            owner_info_list.append((user_name, instance_id))
+
+        return owner_info_list
