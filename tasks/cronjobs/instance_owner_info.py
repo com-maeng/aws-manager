@@ -1,4 +1,6 @@
-'''매 시간 마다 생성된 인스턴스의 소유자 정보를 추출하고 적재하는 기능.'''
+""" 최근 1시간 사이에 생성된 인스턴스의 소유자 정보를 추출하여 데이터베이스에 적재하는 기능을 제공합니다. 
+30분마다 cron 작업을 통해 실행되며, 기존에 저장되어 있던 인스턴스 정보와 비교하여 중복되지 않은 소유자 정보만 적재합니다. 
+"""
 
 
 import os
@@ -12,8 +14,9 @@ sys.path.append(app_dir)
 
 
 if __name__ == "__main__":
-    from datetime import datetime, timedelta
     import pytz
+    from datetime import datetime, timedelta
+
     from client.aws_client import CloudTrailClient
     from client.psql_client import PSQLClient
 

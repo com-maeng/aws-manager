@@ -189,7 +189,7 @@ class CloudTrailClient:
     def get_instance_owner_info(
         self,
         runinstance_events: list[dict]
-    ) -> list[dict]:
+    ) -> list[tuple]:
         '''Log들 중 instance id와 instance의 소유권 정보를 추출'''
 
         owner_info_list = []

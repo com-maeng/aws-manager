@@ -145,28 +145,30 @@ class PSQLClient:
         '''사용자의 instance id 소유 정보를 db에 저장합니다.'''
 
         query = '''
-                    INSERT INTO
-                        ownership_info (iam_name, instance_id)
-                    VALUES
-                        (%s, %s)
-                '''
+            INSERT INTO
+                ownership_info (iam_name, instance_id)
+            VALUES
+                (%s, %s)
+            ;
+        '''
 
         self._execute_query(query, (owner_info_list,), many=True)
 
-    def check_exisited_instance_id(
+    def check_existed_instance_id(
             self,
             instance_id_list: list
-    ) -> Optional[str]:
+    ) -> list[tuple]:
         '''주어진 인스턴스 ID가 DB에 적재되어 있는지 확인합니다.'''
 
         query = '''
-                    SELECT
-                        iam_name, instance_id
-                    FROM
-                        ownership_info
-                    WHERE
-                        instance_id = ANY(%s)
-                '''
+            SELECT
+                iam_name, instance_id
+            FROM
+                ownership_info
+            WHERE
+                instance_id = ANY(%s)
+            ;
+        '''
 
         fetched_data = self._execute_query(query, (instance_id_list,))
 
