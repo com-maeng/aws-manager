@@ -22,7 +22,8 @@ from client.instance_usage_manager import InstanceUsageManager
 # Set up a root logger
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[logging.FileHandler('app.log', mode='a')]
 )
 
 ec2_client = EC2Client()

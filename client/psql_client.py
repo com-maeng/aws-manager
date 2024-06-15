@@ -67,7 +67,7 @@ class PSQLClient:
     def get_track_and_student_id(
         self,
         slack_id: str
-    ) -> tuple[Optional[str], Optional[str]]:
+    ) -> Optional[tuple[str, str]]:
         '''사용자의 정보를 반환합니다.'''
 
         query = '''
@@ -84,7 +84,9 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (slack_id,))
 
         if fetched_data:
-            return fetched_data
+            return fetched_data[0]
+
+        return None
 
     def insert_instance_request_log(
         self,
@@ -135,10 +137,10 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (student_id,))
 
         if fetched_data:
-            return fetched_data[0]  # Single value tuple
-
-        return ''
-
+            return fetched_data[0][0]
+          
+        return None
+ 
     def insert_into_ownership(
             self,
             owner_info_list: list[tuple[str, str]]
@@ -178,3 +180,4 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (instance_id_list,))
 
         return fetched_data
+
