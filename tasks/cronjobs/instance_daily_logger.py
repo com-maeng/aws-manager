@@ -1,4 +1,4 @@
-'''매일 자정마다 running 상태의 인스턴스를 system log에 적재합니다'''
+'''매일 자정마다 running 상태의 인스턴스를 system log에 적재합니다.'''
 
 
 import os
