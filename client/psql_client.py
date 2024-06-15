@@ -141,7 +141,7 @@ class PSQLClient:
 
     def insert_into_ownership(
             self,
-            owner_info_list: list[tuple]
+            owner_info_list: list[tuple[str, str]]
     ) -> None:
         '''사용자의 instance 소유 정보를 DB에 저장합니다.'''
 
@@ -160,8 +160,8 @@ class PSQLClient:
 
     def check_existed_instance_id(
             self,
-            instance_id_list: list
-    ) -> list[tuple]:
+            instance_id_list: list[str]
+    ) -> list[tuple[str, str]]:
         '''주어진 인스턴스가 DB에 적재되어 있는지 확인합니다.'''
 
         query = '''
