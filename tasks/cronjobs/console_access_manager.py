@@ -54,7 +54,7 @@ def main() -> None:
 
     iam_client = IAMClient()  # pylint: disable=used-before-assignment
 
-    if today_dt.hour == 21:
+    if today_dt.hour == 8:
         iam_client.attach_policy_to_group(
             group_name=STUDENT_GROUP_NAME,
             policy_arn=STUDENT_POLICY_ARN,
