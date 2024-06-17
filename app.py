@@ -71,31 +71,20 @@ def handle_stop_command(ack, say, command) -> bool:
 
         return False
 
-    latest_started_instance_id = psql_client.get_latest_started_instance_id(
-        student_id
-    )
+    instance_onwer = psql_client.get_slack_id_by_instance(instance_id)
 
-    if latest_started_instance_id != instance_id:
-        if latest_started_instance_id is None:
-            say('금일 시작 요청을 한 인스턴스가 없습니다.')
-            logging.info(
-                '금일 시작 요청이 없었던에 대한 인스턴스 `/stop` 요청 | 인스턴스 ID: %s',
-                instance_id
-            )
-        else:
-            say('직전에 시작 요청을 했던 인스턴스만 중지할 수 있습니다.')
-            logging.info(
-                '직전에 시작을 요청한 인스턴스와 다른 인스턴에 대한 인스턴스 `/stop` 요청 | 인스턴스 ID: %s',
-                instance_id
-            )
-
+    if slack_id != instance_onwer:
+        say('자신의 소유의 인스턴스만 종료할 수 있습니다.')
+        logging.info(
+            '자신의 소유가 아닌 인스턴스 `/stop` 요청 | slack_id: %s', slack_id
+        )
         return False
 
     ec2_client.stop_instance(instance_id)
 
-    remaining_time = instance_usage_manager.get_remaining_time(
-        instance_id
-    )
+    today_logs = psql_client.get_today_instance_logs(instance_id)
+    remaining_time = instance_usage_manager.get_remaining_time(today_logs)
+
     remain_hours, remain_minutes, _ = str(remaining_time).split(':')
     now = datetime.now(timezone('Asia/Seoul'))
     msg = f'''
@@ -144,6 +133,14 @@ def handle_start_command(ack, say, command) -> bool:
 
         return False
 
+    instance_onwer = psql_client.get_slack_id_by_instance(instance_id)
+    if slack_id != instance_onwer:
+        say('자신의 소유의 인스턴스만 시작할 수 있습니다.')
+        logging.info(
+            '자신의 소유가 아닌 인스턴스 `/start` 요청 | slack_id: %s', slack_id
+        )
+        return False
+
     if instance_state != 'stopped':
         say('인스턴스가 중지(stopped) 상태일 때만 시작할 수 있습니다.')
         logging.info(
@@ -153,9 +150,8 @@ def handle_start_command(ack, say, command) -> bool:
 
         return False
 
-    remaining_time = instance_usage_manager.get_remaining_time(
-        instance_id
-    )
+    today_logs = psql_client.get_today_instance_logs(instance_id)
+    remaining_time = instance_usage_manager.get_remaining_time(today_logs)
 
     if remaining_time <= timedelta():  # (일일 할당량 - 사용시간) <= 0
         say('인스턴스 사용 할당량을 초과했습니다.')

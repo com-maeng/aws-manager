@@ -14,7 +14,8 @@ if __name__ == '__main__':
     from client.aws_client import EC2Client
 
     ec2_client = EC2Client()
-    instance_id_list = ec2_client.get_live_instance_id_list()
+    instance_id_list = ec2_client.get_live_instance_id_list(
+        ['running', 'stopped'])
     allocation_id_list = ec2_client.allocate_eip_address(
         len(instance_id_list)
     )
