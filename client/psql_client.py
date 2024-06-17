@@ -73,7 +73,7 @@ class PSQLClient:
         query = '''
             SELECT
                 track
-                , id
+                , student_id
             FROM
                 student
             WHERE
@@ -99,8 +99,8 @@ class PSQLClient:
 
         query = '''
             INSERT INTO
-                slack_instance_request_log (
-                    student_id
+                slack_user_request_log (
+                    request_user
                     , instance_id
                     , request_type
                     , request_time
@@ -124,10 +124,10 @@ class PSQLClient:
             SELECT 
                 instance_id
             FROM 
-                slack_instance_request_log
+                slack_user_request_log
             WHERE 
                 request_type = 'start'
-                AND student_id = %s
+                AND request_user = %s
             ORDER BY
                 request_time DESC 
             LIMIT
@@ -138,9 +138,9 @@ class PSQLClient:
 
         if fetched_data:
             return fetched_data[0][0]
-          
+
         return None
- 
+
     def insert_into_ownership(
             self,
             owner_info_list: list[tuple[str, str]]
@@ -150,7 +150,7 @@ class PSQLClient:
         query = '''
             INSERT INTO
                 ownership_info (
-                    iam_username
+                    owner
                     , instance_id
                 )
             VALUES
@@ -168,7 +168,7 @@ class PSQLClient:
 
         query = '''
             SELECT
-                iam_username
+                owner
                 , instance_id
             FROM
                 ownership_info
@@ -181,3 +181,99 @@ class PSQLClient:
 
         return fetched_data
 
+    def insert_system_logs(self, instance_id: str, log_type: str, log_time: str) -> None:
+        '''system log를 DB에 저장하는 기능 구현.'''
+
+        query = '''
+            INSERT INTO
+                system_log(
+                    instance_id
+                    , log_type
+                    , log_time)
+            VALUES
+                (%s, %s, %s)
+            ;
+            '''
+        self._execute_query(query, (instance_id, log_type, log_time))
+
+    def get_today_instance_logs(self, instance_id: str) -> list[tuple[str, str]]:
+        '''지정된 인스턴스 ID에 대해 오늘의 로그를 DB에서 조회하여리스트로 반환합니다.
+
+        로그는 'slack_user_request_log'와 'system_log' 두 테이블에서 조회함.
+        '''
+
+        query = '''
+            SELECT
+                instance_id
+                ,request_type
+                ,request_time
+            FROM
+                slack_user_request_log
+            WHERE
+                instance_id = %s
+                AND request_time::DATE = CURRENT_DATE
+            UNION
+            SELECT
+                instance_id
+                ,log_type
+                ,log_time
+            FROM
+                system_log
+            WHERE
+                instance_id = %s
+                AND log_time::DATE = CURRENT_DATE
+            ORDER BY
+                request_time
+            ;
+        '''
+
+        return self._execute_query(query, (instance_id, instance_id))
+
+    def get__student_owned_instances(self, student_id: str) -> list[tuple[str, str]]:
+        '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
+
+        query = '''
+            SELECT 
+                instance_id
+            FROM 
+                ownership_info
+            WHERE 
+                owner = (
+                    SELECT 
+                        iam_username,
+                    FROM
+                        student
+                    WHERE
+                        student_id = %s
+                )
+            ;
+        '''
+
+        return self._execute_query(query, (student_id,))
+
+    def get_slack_id_by_instance(self, instance_id: str) -> list[tuple[str,]]:
+        '''해당 인스턴스 id를 가지고 있는 학생의 slack id의 값을 반환합니다.'''
+
+        query = '''
+            SELECT
+                slack_id
+            FROM
+                student
+            WHERE
+                iam_username = (
+                    SELECT
+                        owner
+                    FROM
+                        ownership_info
+                    WHERE
+                        instance_id = %s
+                )
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (instance_id,))
+
+        if fetched_data:
+            return fetched_data[0][0]
+
+        return None
