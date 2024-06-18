@@ -22,7 +22,7 @@ class EC2Client:
             region_name='ap-northeast-2',
         )
 
-    def get_instance_state(self, instance_id: Optional[str]) -> str:
+    def get_instance_state(self, instance_id: Optional[str]) -> Optional[str]:
         '''Get the current state of the EC2 instance.'''
 
         try:
@@ -32,12 +32,7 @@ class EC2Client:
             return state
         except ClientError as e:
             logging.error(
-                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID: %s | %s',
-                instance_id,
-                e
-            )
-
-            return ''
+                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID: %s | %s', instance_id, e)
 
     def start_instance(self, instance_id: str) -> None:
         '''Start the EC2 instance.'''

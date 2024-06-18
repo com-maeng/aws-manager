@@ -22,9 +22,7 @@ class PSQLClient:
         query: str,
         params: tuple = None,
         many: bool = False
-    ) -> list[Optional[tuple]]:
-        fetched_data = []
-
+    ) -> Optional[list[tuple[str]]]:
         try:
             with psycopg.connect(  # pylint: disable=not-context-manager
                 host=self.host,
@@ -40,13 +38,9 @@ class PSQLClient:
                         cur.execute(query, params)
 
                     if query.split()[0] == 'SELECT':
-                        fetched_data = cur.fetchall()
+                        return cur.fetchall()
         except psycopg.Error as e:
-            logging.error('쿼리 실행 실패 | %s', e)
-
-            raise e
-
-        return fetched_data
+            logging.error('쿼리 실행 실패 | query: %s | error: %s', query, e)
 
     def insert_into_student(
         self,
@@ -142,17 +136,14 @@ class PSQLClient:
         return None
 
     def insert_into_ownership(
-            self,
-            owner_info_list: list[tuple[str, str]]
+        self,
+        owner_info_list: list[tuple[str, str]]
     ) -> None:
         '''사용자의 instance 소유 정보를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO
-                ownership_info (
-                    owner
-                    , instance_id
-                )
+                ownership_info (owner, instance_id)
             VALUES
                 (%s, %s)
             ;
@@ -161,8 +152,8 @@ class PSQLClient:
         self._execute_query(query, (owner_info_list,), many=True)
 
     def check_existed_instance_id(
-            self,
-            instance_id_list: list[str]
+        self,
+        instance_id_list: list[str]
     ) -> list[tuple[str, str]]:
         '''주어진 인스턴스가 DB에 적재되어 있는지 확인합니다.'''
 
@@ -180,6 +171,36 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (instance_id_list,))
 
         return fetched_data
+
+    def get_owned_instance(self, slack_id: str) -> Optional[list[tuple[str]]]:
+        '''사용자의 slack_id를 활용하여 사용자 소유의 인스턴스의 ID를 반환합니다.'''
+
+        query = '''
+            SELECT
+                instance_id
+            FROM
+                ownership_info
+            WHERE
+                owner = (
+                    SELECT
+                        iam_username
+                    FROM
+                        student
+                    WHERE
+                        slack_id = %s
+                )
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (slack_id,))
+
+        if fetched_data:
+            instance_id_list = []
+
+            for d in fetched_data:
+                instance_id_list.append(d[0])  # instance_id
+
+            return instance_id_list
 
     def insert_system_logs(self, instance_id: str, log_type: str, log_time: str) -> None:
         '''system log를 DB에 저장하는 기능 구현.'''

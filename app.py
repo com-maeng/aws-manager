@@ -21,7 +21,7 @@ from client.instance_usage_manager import InstanceUsageManager
 
 # Set up a root logger
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
     handlers=[logging.FileHandler('app.log', mode='a')]
 )
@@ -34,6 +34,40 @@ instance_usage_manager = InstanceUsageManager()
 app = Flask(__name__)
 slack_app = slack_client.app
 slack_req_handler = SlackRequestHandler(slack_app)
+
+
+@slack_app.command('/show')
+def handle_show_command(ack, say, command) -> bool:
+    '''사용자 소유의 인스턴스 상태 조회 커맨드(/show)를 처리합니다.'''
+
+    ack()  # 3초 이내 응답 필요
+
+    slack_id = command['user_id']
+    owned_instance_id_list = psql_client.get_owned_instance(slack_id)
+    instance_state_list = []
+    instance_state_pairs = []
+
+    if not owned_instance_id_list:
+        say('현재 소유 중인 인스턴스가 없습니다.')
+        logging.info('소유 중인 인스턴스가 없는 사용자의 `/show` 요청 | slack_id: %s', slack_id)
+
+        return False
+
+    for owned_instance_id in owned_instance_id_list:
+        instance_state = ec2_client.get_instance_state(owned_instance_id)
+
+        instance_state_list.append(instance_state)
+
+    for tup in zip(owned_instance_id_list, instance_state_list):
+        # - i-1234567890abcdef0 : running, - i-abcdef1234567890 : stopped, ...
+        instance_state_pairs.append(f'- {tup[0]} : {tup[1]}')
+
+    msg = '\n'.join(instance_state_pairs)
+
+    say(msg)
+    logging.info('인스턴스 상태 조회 요청 | slack_id: %s', slack_id)
+
+    return True
 
 
 @slack_app.command('/stop')
