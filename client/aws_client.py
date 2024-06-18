@@ -64,17 +64,14 @@ class EC2Client:
                 e
             )
 
-    def get_live_instance_id_list(self) -> list[str]:
+    def get_live_instance_id_list(self, state: list[str]) -> list[str]:
         '''시작/중지 상태인 모든 EC2 인스턴스의 ID가 담긴 리스트를 반환합니다.'''
 
         instance_id_list = []
         response = self.client.describe_instances(Filters=[
             {
                 'Name': 'instance-state-name',
-                'Values': [
-                    'running',
-                    'stopped',
-                ],
+                'Values': state,
             },
         ])
         reservations = response['Reservations']
@@ -136,6 +133,57 @@ class EC2Client:
                     instance_id,
                     e
                 )
+
+
+class IAMClient:
+    '''IAM API를 활용하는 작업을 처리합니다.'''
+
+    def __init__(self):
+        self.client = boto3.client(
+            'iam',
+            aws_access_key_id=os.getenv('AWS_MANAGER_AWS_ACCESS_KEY'),
+            aws_secret_access_key=os.getenv(
+                'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
+            region_name='ap-northeast-2',
+        )
+
+    def detach_policy_from_group(
+            self,
+            group_name: str,
+            policy_arn: str,
+    ) -> None:
+        '''IAM 그룹에서 특정 정책을 제거합니다.'''
+
+        try:
+            self.client.detach_group_policy(
+                GroupName=group_name,
+                PolicyArn=policy_arn,
+            )
+        except ClientError as e:
+            logging.error(
+                'IAM 그룹 정책 제거 API(`detach_group_policy()`) 호출 실패 | %s',
+                e,
+            )
+            raise e
+
+    def attach_policy_to_group(
+            self,
+            group_name: str,
+            policy_arn: str,
+    ) -> None:
+        '''IAM 그룹에 특정 정책을 추가합니다.'''
+
+        try:
+            self.client.attach_group_policy(
+                GroupName=group_name,
+                PolicyArn=policy_arn,
+            )
+        except ClientError as e:
+            logging.error(
+                'IAM 그룹 정책 부여 API(`attach_group_policy()`) 호출 실패 | %s',
+                e,
+            )
+            raise e
 
 
 class CloudTrailClient:
