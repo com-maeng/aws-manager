@@ -4,7 +4,7 @@
 import os
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -203,58 +203,21 @@ class CloudTrailClient:
             region_name='ap-northeast-2',
         )
 
-    def get_runinstance_events(
-        self,
-        start_time: datetime,
-        end_time: datetime,
-    ) -> list[dict]:
-        ''' 지정된 시간 범위에 생성된 Runinstances 로그들을 추출합니다.'''
-
-        runinstance_events = []
-        response = self.client.lookup_events(
-            LookupAttributes=[
-                {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
-            ],
-            StartTime=start_time,
-            EndTime=end_time,
-            MaxResults=50,
-        )
-        runinstance_events.extend(response['Events'])
-
-        while 'NextToken' in response:
-            response = self.client.lookup_events(
-                LookupAttributes=[
-                    {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
-                ],
-                StartTime=start_time,
-                EndTime=end_time,
-                MaxResults=50,
-                NextToken=response['NextToken']
-            )
-            runinstance_events.extend(response['Events'])
-
-        return runinstance_events
-
     def get_event_logs_by_event_names(
         self,
-        event_name: str = "StartInstances",
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+        event_name: str,
+        start_time: datetime,
+        end_time: datetime
     ) -> Optional[list[dict]]:
         ''' 지정된 시간 범위에 생성된 CloudTrail 로그들을 중 해당 event name에 알맞는 log들을 추출합니다.
 
         Args:
             event_names (list[str]) : AWS CloudTrail Event history의 Event name 입니다. 
-            start_time (datetime) : 조회 시작 시간으로 UTC 기준 시간이 들어와야 합니다. 
-            end_time (datetime) : 조회 종료 시간으로 UTC 기준 시간이 들어와야 합니다.  
+            start_time (datetime) : 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+            end_time (datetime) : 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
         '''
 
         event_logs = []
-
-        if (start_time is None or not isinstance(start_time, datetime)):
-            raise TypeError('start time은 datetime 이여야 합니다.')
-        elif (end_time is None or not isinstance(end_time, datetime)):
-            raise TypeError('end time은 datetime 이여야 합니다.')
 
         response = self.client.lookup_events(
             LookupAttributes=[

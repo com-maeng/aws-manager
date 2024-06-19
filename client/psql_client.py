@@ -283,7 +283,7 @@ class PSQLClient:
 
         query = '''
             INSERT INTO
-                cloudtrail_log_test (instance_id, log_type,log_time)
+                cloudtrail_log (instance_id, log_type,log_time)
             VALUES
                 (%s, %s, %s)
             ON CONFLICT (instance_id, log_type,log_time) DO NOTHING

@@ -3,9 +3,11 @@
 
 import os
 import sys
+from datetime import datetime, timedelta
+
 
 import pytz
-from datetime import datetime, timedelta
+
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
@@ -19,7 +21,7 @@ if __name__ == "__main__":
     cloudtrail_client = CloudTrailClient()
     psql_client = PSQLClient()
     end_time = datetime.now(pytz.utc)
-    start_time = end_time - timedelta(minutes=7)
+    start_time = end_time - timedelta(minutes=10)
     total_logs = []
 
     stop_logs = cloudtrail_client.get_event_logs_by_event_names('StopInstances',
