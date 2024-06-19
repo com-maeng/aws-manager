@@ -298,3 +298,33 @@ class PSQLClient:
             return fetched_data[0][0]
 
         return None
+
+    def get_student_info(self) -> list[tuple[str, str]]:
+        '''DB에 적재된 학생들의 id와 이름을 추출합니다.'''
+
+        query = '''
+            SELECT 
+                student_id, 
+                name
+            FROM
+                student
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
+
+    def insert_into_iam_user(self, iam_user_data: list[tuple[str, str]]
+                             ) -> None:
+        '''iam_user table에 데이터를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                iam_user (user_name, owned_by)
+            VALUES
+                (%s, %s)
+            ;
+        '''
+
+        self._execute_query(query, (iam_user_data, ), many=True)
