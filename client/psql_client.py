@@ -277,3 +277,17 @@ class PSQLClient:
             return fetched_data[0][0]
 
         return None
+
+    def insert_into_cloudtrail_log(self, logs: Optional[list[tuple]]) -> None:
+        '''CloudTrail의 로그를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                cloudtrail_log_test (instance_id, log_type,log_time)
+            VALUES
+                (%s, %s, %s)
+            ON CONFLICT (instance_id, log_type,log_time) DO NOTHING
+            ;
+        '''
+
+        self._execute_query(query, (logs, ), many=True)

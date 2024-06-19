@@ -26,8 +26,8 @@ if __name__ == "__main__":
     end_time = datetime.now(pytz.utc)
     start_time = end_time - timedelta(hours=1)
 
-    runinstance_event_list = cloudtrail_client.get_runinstance_events(
-        start_time, end_time)
+    runinstance_event_list = cloudtrail_client.get_event_logs_by_event_names(
+        'RunInstances', start_time, end_time)
     owner_info = cloudtrail_client.get_instance_owner_info(
         runinstance_event_list)
 
