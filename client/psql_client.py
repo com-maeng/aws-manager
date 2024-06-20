@@ -304,8 +304,8 @@ class PSQLClient:
 
         query = '''
             SELECT 
-                student_id, 
-                name
+                name,
+                student_id
             FROM
                 student
             ;
