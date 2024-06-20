@@ -27,7 +27,9 @@ if __name__ == '__main__':
 
         for row in csv_data:
             name = row[1]
+            iam_user = row[2]
             if student_info_dict.get(name):
-                data_to_db.append((row[2], student_info_dict[name]))
+                student_id = student_info_dict[name]
+                data_to_db.append((iam_user, student_id))
 
     psql_client.insert_into_iam_user(data_to_db)
