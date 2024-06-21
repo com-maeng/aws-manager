@@ -5,8 +5,8 @@ Example:
 '''
 
 
+import asyncio
 import logging
-import threading
 from datetime import datetime, timedelta
 
 from slack_bolt.adapter.flask import SlackRequestHandler
@@ -226,14 +226,14 @@ def handle_start_command(ack, say, command) -> bool:
 def handle_policy_command(ack, say, command) -> bool:
 
     ack()
-    say("시작")
 
-    def delayed_task():
-        say('10초 지났습니다.')
+    async def my_coroutine():
+        print("Coroutine 시작")
+        await asyncio.sleep(10)  # 2초 동안 일시 정지
+        print("Coroutine 재개")
 
-    # 30분(1800초) 후에 delayed_task 함수 실행
-    timer = threading.Timer(10, delayed_task)
-    timer.start()
+    # 코루틴 함수 호출 및 실행
+    asyncio.run(my_coroutine())
 
 
 @app.route('/slack/events', methods=['POST'])
