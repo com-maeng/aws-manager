@@ -6,7 +6,7 @@ Example:
 
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
 from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request
@@ -43,7 +43,7 @@ def handle_show_command(ack, say, command) -> bool:
     ack()  # 3초 이내 응답 필요
 
     slack_id = command['user_id']
-    owned_instance_id_list = psql_client.get_owned_instance(slack_id)
+    owned_instance_id_list = psql_client.get_user_owned_instance(slack_id)
     instance_state_list = []
     instance_state_pairs = []
 
@@ -133,7 +133,6 @@ def handle_stop_command(ack, say, command) -> bool:
     say(msg)
     psql_client.insert_instance_request_log(
         student_id,
-        instance_id,
         'stop',
         str(now)
     )
@@ -147,75 +146,106 @@ def handle_start_command(ack, say, command) -> bool:
 
     ack()  # 3초 이내 응답 필요
 
-    # 사용자 입력값의 가장 마지막에 인스턴스 ID가 위치한다고 가정
-    instance_id = command['text'].split()[-1]
-
     slack_id = command['user_id']
-    instance_state = ec2_client.get_instance_state(instance_id)
 
+    # 교육생 여부 체크
     try:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
-    except ValueError:
+    except ValueError as e:
         say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
-        logging.info('교육생이 아닌 사용자의 `/start` 요청 | slack_id: %s', slack_id)
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/start` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
 
         return False
 
+    # DE 트랙 교육생 여부 체크
     if track != 'DE':
         say('현재는 DE 트랙 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
-        logging.info('DE 트랙 외 교육생 `/start` 요청 | slack_id: %s', slack_id)
+        logging.info('DE 트랙 외 교육생의 `/start` 요청 | 슬랙 ID: %s', slack_id)
 
         return False
 
-    instance_onwer = psql_client.get_slack_id_by_instance(instance_id)
-    if slack_id != instance_onwer:
-        say('자신의 소유의 인스턴스만 시작할 수 있습니다.')
+    # 소유 중인 인스턴스 조회
+    instance_id_list = psql_client.get_user_owned_instance(student_id)
+
+    if not instance_id_list:
+        say('현재 소유 중인 인스턴스가 없습니다.')
         logging.info(
-            '자신의 소유가 아닌 인스턴스 `/start` 요청 | slack_id: %s', slack_id
-        )
-        return False
-
-    if instance_state != 'stopped':
-        say('인스턴스가 중지(stopped) 상태일 때만 시작할 수 있습니다.')
-        logging.info(
-            '중지 상태가 아닌 인스턴스 `/start` 요청 | 인스턴스 상태: %s',
-            instance_state
-        )
-
-        return False
-
-    today_logs = psql_client.get_today_instance_logs(instance_id)
-    remaining_time = instance_usage_manager.get_remaining_time(today_logs)
-
-    if remaining_time <= timedelta():  # (일일 할당량 - 사용시간) <= 0
-        say('인스턴스 사용 할당량을 초과했습니다.')
-        logging.info(
-            '인스턴스 사용 할당량 초과 상태에서 `/start` 요청 | slack_id: %s',
+            '소유 중인 인스턴스가 없는 사용자의 `/start` 요청 | 슬랙 ID: %s',
             slack_id
         )
 
         return False
 
-    ec2_client.start_instance(instance_id)
+    # 모든 인스턴스가 `running` 상태인지 확인
+    instance_state_dict = ec2_client.get_instance_state(instance_id_list)
+    state_values = instance_state_dict.values()
 
-    remain_hours, remain_minutes, _ = str(remaining_time).split(":")
+    if not any(value == 'stopped' for value in state_values):
+        say('이미 모든 인스턴스가 running 상태입니다.')
+        logging.info(
+            '모든 인스턴스의 상태가 running일 때의 `/start` 요청 | 인스턴스 상태: %s',
+            instance_state_dict
+        )
+
+        return False
+
+    # 인스턴스 사용 할당량 초과 여부 확인
+    remaining_tm = psql_client.get_remaining_usage_time(student_id)
+
+    if remaining_tm == time.min:
+        msg = '''\
+오늘의 인스턴스 사용 할당량을 모두 초과하였습니다.
+
+💡 일별 할당량
+- 평일 할당량: 6시간
+- 주말 할당량: 12시간\
+        '''
+
+        say(msg)
+        logging.info(
+            '인스턴스 사용 할당량 초과 상태에서 `/start` 요청 | 슬랙 ID: %s',
+            slack_id
+        )
+
+        return False
+
+    # 인스턴스 시작
+    if not ec2_client.start_instance(instance_id_list):
+        say('알 수 없는 이유로 인스턴스 시작에 실패했습니다.')
+        logging.error('인스턴스 시작 실패 | 인스턴스 ID: %s', instance_id_list)
+
+        return False
+
+    logging.info('인스턴스 시작 | 인스턴스 ID: %s', instance_id_list)
+
+    # 성공 메시지 전송
     now = datetime.now(timezone('Asia/Seoul'))
-    msg = f'''
-{instance_id}를 시작했습니다.
+    maximum_usage_time = now + timedelta(
+        hours=remaining_tm.hour,
+        minutes=remaining_tm.minute,
+        seconds=remaining_tm.second
+    )
+    msg = f'''\
+인스턴스를 성공적으로 시작했습니다 🚀
+인스턴스를 사용한 다음에는 반드시 `/stop` 명령어로 종료해주세요 ⚠️
 
-- 오늘의 잔여 할당량: {remain_hours}시간 {remain_minutes}분 
-- 인스턴스 시작 시간: {now.strftime('%Y-%m-%d %H:%M분')}
-- 인스턴스 최대 사용 시간: {(now + remaining_time).strftime('%Y-%m-%d %H:%M분')}
+- 오늘의 잔여 할당량: `{remaining_tm.hour}시간 {remaining_tm.minute}분 {remaining_tm.second}초`
+- 인스턴스 최대 사용 가능 시간: `{maximum_usage_time.strftime('%Y-%m-%d %H:%M:%S')}`
 
-*인스턴스 사용량 초기화는 매일 자정에 진행됩니다.*
+_인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     say(msg)
+
+    # 로그 데이터 적재
     psql_client.insert_instance_request_log(
         student_id,
-        instance_id,
         'start',
-        str(now)
+        str(now.strftime('%Y-%m-%d %H:%M:%S'))
     )
 
     return True
