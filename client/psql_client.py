@@ -268,7 +268,7 @@ class PSQLClient:
     def get_slack_id_by_instance(
         self,
         instance_id: str
-    ) -> list[tuple[str,]]:
+    ) -> list[tuple[str, str]]:
         '''해당 인스턴스 id를 가지고 있는 학생의 slack id의 값을 반환합니다.'''
 
         query = '''
