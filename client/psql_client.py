@@ -315,9 +315,10 @@ class PSQLClient:
 
         return fetched_data
 
-    def insert_into_iam_user(self,
-                             iam_user_data: list[tuple[str, str]]
-                             ) -> None:
+    def insert_into_iam_user(
+        self,
+        iam_user_data: list[tuple[str, str]]
+    ) -> None:
         '''iam_user table에 데이터를 적재합니다.'''
 
         query = '''
