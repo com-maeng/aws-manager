@@ -236,7 +236,10 @@ class CloudTrailClient:
         while 'NextToken' in response:
             response = self.client.lookup_events(
                 LookupAttributes=[
-                    {'AttributeKey': 'EventName', 'AttributeValue': event_name}
+                    {
+                        'AttributeKey': 'EventName',
+                        'AttributeValue': event_name
+                    }
                 ],
                 StartTime=start_time,
                 EndTime=end_time,
