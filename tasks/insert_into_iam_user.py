@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     from client.psql_client import PSQLClient
 
-    # csv에 따라 변경되어야 합니다.
+    # csv파일에 따라 변경되어야 합니다.
     CSV_FILE_PATH = './student_AWS_IAM_Username.csv'
 
     psql_client = PSQLClient()
@@ -26,7 +26,7 @@ if __name__ == '__main__':
         csv_data = csv.reader(file)
 
         for row in csv_data:
-            name = row[1]  # csv에 기재된 한글 본명 정보
+            name = row[1]  # csv 파일에 기재된 한글 본명 정보
             iam_user = row[2]
 
             if student_info_dict.get(name):

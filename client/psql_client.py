@@ -300,11 +300,11 @@ class PSQLClient:
         return None
 
     def get_name_and_student_id(self) -> list[tuple[str, str]]:
-        '''DB에 적재된 학생들의 id와 이름을 추출합니다.'''
+        '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
 
         query = '''
             SELECT 
-                name
+                name    --한글 본명
                 , student_id
             FROM
                 student
@@ -319,7 +319,7 @@ class PSQLClient:
         self,
         iam_user_data: list[tuple[str, str]]
     ) -> None:
-        '''iam_user table에 데이터를 적재합니다.'''
+        '''iam_user 테이블에 데이터를 적재합니다.'''
 
         query = '''
             INSERT INTO
