@@ -240,7 +240,7 @@ class PSQLClient:
 
         return self._execute_query(query, (instance_id, instance_id))
 
-    def get__student_owned_instances(
+    def get_student_owned_instances(
         self,
         student_id: str
     ) -> list[tuple[str, str]]:
