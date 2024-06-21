@@ -185,6 +185,44 @@ class IAMClient:
             )
             raise e
 
+    def attach_user_policy(
+            self,
+            user_name: str,
+            policy_arn: str,
+    ) -> None:
+        '''IAM user에게 특정 정책을 추가합니다.'''
+
+        try:
+            self.client.attach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 부여 API(`attach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+            raise e
+
+    def detach_user_policy(
+            self,
+            user_name: str,
+            policy_arn: str,
+    ) -> None:
+        '''IAM user에게 특정 정책을 제거합니다.'''
+
+        try:
+            self.client.detach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 제거 API(`detach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+            raise e
+
 
 class CloudTrailClient:
     '''CloudTrail 클라이언트로 인스턴스의 소유자 정보 확인하는 기능을 제공합니다.'''

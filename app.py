@@ -15,7 +15,7 @@ from flask import Flask, request
 from pytz import timezone
 
 from client.slack_client import SlackClient
-from client.aws_client import EC2Client
+from client.aws_client import EC2Client, IAMClient
 from client.psql_client import PSQLClient
 from client.instance_usage_manager import InstanceUsageManager
 
@@ -28,6 +28,7 @@ logging.basicConfig(
 )
 
 ec2_client = EC2Client()
+iam_client = IAMClient()
 slack_client = SlackClient()
 psql_client = PSQLClient()
 instance_usage_manager = InstanceUsageManager()
@@ -222,18 +223,59 @@ def handle_start_command(ack, say, command) -> bool:
     return True
 
 
-@slack_app.command('/yj_policy')
+@slack_app.command('/policy')
 def handle_policy_command(ack, say, command) -> bool:
-
+    '''AWS 권한 부여 커맨드(/policy)를 처리합니다.'''
     ack()
 
-    async def my_coroutine():
-        print("Coroutine 시작")
-        await asyncio.sleep(10)  # 2초 동안 일시 정지
-        print("Coroutine 재개")
+    slack_id = command['user_id']
+
+    try:
+        _, student_id = psql_client.get_track_and_student_id(slack_id)
+    except ValueError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 AWS 콘솔 접근 권한을 부여받을 수 없습니다.')
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/start` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+        return False
+
+    iam_user_name = psql_client.get_iam_user_name(student_id)
+
+    if not iam_user_name:
+        say('IAM 계정이 없습니다. 관리자에게 문의해주세요.')
+        logging.info(
+            'IAM 계정이 없는 유저의 권한 부여 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+        return False
+
+    command_request_count = psql_client.get_today_slack_policy_log(student_id)
+
+    if command_request_count > 4:
+        say('금일의 policy 요청 횟수를 초과하였습니다.')
+        logging.info(
+            '`/policy` 요청 횟수 초과 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+        return False
+
+    async def access_permissions_manager():
+        policy_arn = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'
+        iam_client.attach_user_policy(iam_user_name, policy_arn)
+        say('인스턴스 콘솔 접근 권한을 부여했습니다.')
+
+        await asyncio.sleep(900)
+
+        iam_client.detach_user_policy(iam_user_name, policy_arn)
+        say('할당 시간이 지나 콘솔 접근 권한을 회수했습니다.')
+        # psql_client.insert_instance_request_log() TODO:
 
     # 코루틴 함수 호출 및 실행
-    asyncio.run(my_coroutine())
+    asyncio.run(access_permissions_manager())
 
 
 @app.route('/slack/events', methods=['POST'])

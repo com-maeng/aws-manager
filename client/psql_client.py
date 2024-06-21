@@ -298,3 +298,41 @@ class PSQLClient:
             return fetched_data[0][0]
 
         return None
+
+    def get_iam_user_name(self, student_id: str) -> Optional[str]:
+        '''iam_user table 에서 user_name을 반환합니다.'''
+
+        query = '''
+            SELECT
+                user_name
+            FROM
+                iam_user
+            WHERE
+                owned_by = %s
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (student_id,))
+
+        if fetched_data:
+            return fetched_data[0][0]
+
+        return None
+
+    def get_today_slack_policy_log(self, student_id: int) -> int:
+        '''사용자가 오늘 요청한 ()`/policy`) 횟수를 반환합니다.'''
+
+        query = '''
+            SELECT 
+                COUNT(*)
+            FROM 
+                slack_user_request_log
+            WHERE 
+                request_type = 'policy'
+                AND request_user = %s
+                AND request_time::DATE = CURRENT_DATE
+            ;
+        '''
+        fetched_data = self._execute_query(query, (student_id,))[0][0]
+
+        return fetched_data
