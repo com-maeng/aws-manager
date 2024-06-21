@@ -278,7 +278,7 @@ class PSQLClient:
 
         return None
 
-    def insert_into_cloudtrail_log(self, logs: Optional[list[tuple]]) -> None:
+    def insert_into_cloudtrail_log(self, logs: Optional[list[tuple[str, str, str]]]) -> None:
         '''CloudTrail의 로그를 적재합니다.'''
 
         query = '''
@@ -286,7 +286,8 @@ class PSQLClient:
                 cloudtrail_log (instance_id, log_type,log_time)
             VALUES
                 (%s, %s, %s)
-            ON CONFLICT (instance_id, log_type,log_time) DO NOTHING
+            ON 
+                CONFLICT (instance_id, log_type,log_time) DO NOTHING
             ;
         '''
 

@@ -203,18 +203,18 @@ class CloudTrailClient:
             region_name='ap-northeast-2',
         )
 
-    def get_event_logs_by_event_names(
+    def get_event_logs_by_event_name(
         self,
         event_name: str,
         start_time: datetime,
         end_time: datetime
-    ) -> Optional[list[dict]]:
-        ''' 지정된 시간 범위에 생성된 CloudTrail 로그들을 중 해당 event name에 알맞는 log들을 추출합니다.
+    ) -> Optional[list[dict[str,]]]:
+        ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞는 log들을 추출합니다.
 
         Args:
-            event_names (list[str]) : AWS CloudTrail Event history의 Event name 입니다. 
-            start_time (datetime) : 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
-            end_time (datetime) : 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+            event_name (str): AWS CloudTrail Event history의 Event name 입니다. 
+            start_time (datetime): 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+            end_time (datetime): 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
         '''
 
         event_logs = []
