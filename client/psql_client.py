@@ -115,7 +115,8 @@ class PSQLClient:
         )
 
     def get_latest_started_instance_id(
-        self, student_id
+        self,
+        student_id
     ) -> Optional[str]:
         '''사용자가 가장 최근에 시작(`/start`) 요청을 한 인스턴스의 ID를 반환합니다.
 
@@ -184,7 +185,10 @@ class PSQLClient:
         return fetched_data
 
     def insert_system_logs(
-        self, instance_id: str, log_type: str, log_time: str
+        self,
+        instance_id: str,
+        log_type: str,
+        log_time: str
     ) -> None:
         '''system log를 DB에 저장하는 기능 구현.'''
 
@@ -201,7 +205,8 @@ class PSQLClient:
         self._execute_query(query, (instance_id, log_type, log_time))
 
     def get_today_instance_logs(
-        self, instance_id: str
+        self,
+        instance_id: str
     ) -> list[tuple[str, str]]:
         '''지정된 인스턴스 ID에 대해 오늘의 로그를 DB에서 조회하여리스트로 반환합니다.
 
@@ -236,7 +241,8 @@ class PSQLClient:
         return self._execute_query(query, (instance_id, instance_id))
 
     def get__student_owned_instances(
-        self, student_id: str
+        self,
+        student_id: str
     ) -> list[tuple[str, str]]:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
