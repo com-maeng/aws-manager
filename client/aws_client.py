@@ -22,32 +22,56 @@ class EC2Client:
             region_name='ap-northeast-2',
         )
 
-    def get_instance_state(self, instance_id: Optional[str]) -> Optional[str]:
-        '''Get the current state of the EC2 instance.'''
+    def get_instance_state(
+        self,
+        instance_ids: list[str]
+    ) -> Optional[dict[str, str]]:
+        '''AWS API를 호출하여 인스턴스의 상태를 반환합니다.'''
 
         try:
-            resp = self.client.describe_instances(InstanceIds=[instance_id])
-            state = resp['Reservations'][0]['Instances'][0]['State']['Name']
-
-            return state
+            resp_dict = self.client.describe_instances(
+                InstanceIds=instance_ids
+            )
         except ClientError as e:
             logging.error(
-                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID: %s | %s', instance_id, e)
+                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID 목록: %s | %s',
+                instance_ids,
+                e
+            )
 
-    def start_instance(self, instance_id: str) -> None:
-        '''Start the EC2 instance.'''
+            return None
+
+        instance_state_dict = {}
+
+        for r in resp_dict['Reservations']:
+            instance_id = r['Instances'][0]['InstanceId']
+            state = r['Instances'][0]['State']['Name']
+
+            instance_state_dict[instance_id] = state
+
+        return instance_state_dict
+
+    def start_instance(
+        self,
+        instance_ids: list[str]
+    ) -> bool:
+        '''EC2 인스턴스를 시작합니다.'''
 
         try:
             self.client.start_instances(
-                InstanceIds=[instance_id],
+                InstanceIds=instance_ids,
                 DryRun=False
             )
+
+            return True
         except ClientError as e:
             logging.error(
                 '인스턴스 시작 API (`start_instances()`) 호출 실패 | 인스턴스 ID: %s | %s',
-                instance_id,
+                instance_ids,
                 e
             )
+
+            return False
 
     def stop_instance(self, instance_id: str) -> None:
         '''Stop the EC2 instance.'''
