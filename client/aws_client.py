@@ -208,7 +208,7 @@ class CloudTrailClient:
         event_name: str,
         start_time: datetime,
         end_time: datetime
-    ) -> Optional[list[dict[str,]]]:
+    ) -> Optional[list[dict]]:
         ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞는 log들을 추출합니다.
 
         Args:
