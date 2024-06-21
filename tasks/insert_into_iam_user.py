@@ -13,21 +13,22 @@ if __name__ == '__main__':
 
     from client.psql_client import PSQLClient
 
-    # csv에 따라 변경되여야 합니다.
+    # csv에 따라 변경되어야 합니다.
     CSV_FILE_PATH = './student_AWS_IAM_Username.csv'
 
     psql_client = PSQLClient()
-    student_info = psql_client.get_student_info()
+    student_info = psql_client.get_name_and_student_id()
     student_info_dict = dict(student_info)
 
     data_to_db = []
 
-    with open(CSV_FILE_PATH, mode='r', newline='', encoding='utf-8') as flie:
-        csv_data = csv.reader(flie)
+    with open(CSV_FILE_PATH, mode='r', newline='', encoding='utf-8') as file:
+        csv_data = csv.reader(file)
 
         for row in csv_data:
-            name = row[1]
+            name = row[1]  # csv에 기재된 한글 본명 정보
             iam_user = row[2]
+
             if student_info_dict.get(name):
                 student_id = student_info_dict[name]
                 data_to_db.append((iam_user, student_id))
