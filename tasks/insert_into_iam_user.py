@@ -1,4 +1,4 @@
-'''iam user 정보가 포함된 csv의 data를 DB에 적재하는 기능 구현.'''
+'''iam user 정보가 포함된 csv 파일의 데이터를 DB에 적재하는 기능 구현.'''
 
 
 import os
@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     from client.psql_client import PSQLClient
 
-    # csv파일에 따라 변경되어야 합니다.
+    # 해당 csv 파일 경로를 입력해야 합니다.
     CSV_FILE_PATH = './student_AWS_IAM_Username.csv'
 
     psql_client = PSQLClient()
