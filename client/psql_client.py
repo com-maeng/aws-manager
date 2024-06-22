@@ -82,7 +82,7 @@ class PSQLClient:
 
     def insert_instance_request_log(
         self,
-        student_id: str,
+        student_id: int,
         request_type: str,
         request_time: str
     ) -> None:
@@ -99,6 +99,7 @@ class PSQLClient:
                 (%s, %s, %s)
             ;
         '''
+
         self._execute_query(
             query,
             (student_id, request_type, request_time)
@@ -347,7 +348,7 @@ class PSQLClient:
 
         return None
 
-    def get_policy_request_count(self, student_id: int) -> int:
+    def get_policy_request_count(self, student_id: int) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
         query = '''
@@ -361,6 +362,7 @@ class PSQLClient:
                 AND request_time::DATE = CURRENT_DATE
             ;
         '''
-        fetched_data = self._execute_query(query, (student_id,))[0][0]
+
+        fetched_data = self._execute_query(query, (student_id,))
 
         return fetched_data

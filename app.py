@@ -287,17 +287,25 @@ def handle_policy_command(ack, say, command) -> bool:
 
     policy_reqeust_count = psql_client.get_policy_request_count(student_id)
 
-    if policy_reqeust_count > 4:
+    if not policy_reqeust_count:
+        say('데이터를 불러오는 중에 문제가 발생했습니다. 관리자에게 문의해주세요!')
+
+        return False
+
+    if policy_reqeust_count[0][0] > 4:
         msg = '''\
 오늘은 더이상 임시 콘솔 접근 권한을 요청할 수 없습니다.:melting_face:
 임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. 
 '''
+
         say(msg)
+
         logging.info(
             '`/policy` 요청 횟수 초과 요청 | 슬랙 ID: %s | %s',
             slack_id,
             e
         )
+
         return False
 
     async def access_permissions_manager(iam_user_name: str) -> None:
@@ -306,6 +314,7 @@ def handle_policy_command(ack, say, command) -> bool:
         # 접근 권한 부여
         if not iam_client.attach_user_policy(iam_user_name, STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 부여 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+
             return False
 
         msg = '''\
@@ -322,21 +331,25 @@ AWS 콘솔 접근 권한을 드렸습니다. 🚀
             str(now.strftime('%Y-%m-%d %H:%M:%S'))
         )
 
-        await asyncio.sleep(100)
+        await asyncio.sleep(900)
 
         # 접근 권한 회수
         if not iam_client.detach_user_policy(iam_user_name, STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 회수 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+
             return False
 
         msg = f'''\
 15분이 경과하여 콘솔 접근 권한이 회수되었습니다. :smiling_face_with_tear:
 ⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count}번 남았습니다.
 '''
+
         say(msg)
+
         return True
 
     iam_user_name = psql_client.get_iam_user_name(student_id)
+
     if iam_user_name:
         # 비동기 함수 호출 및 실행
         asyncio.run(access_permissions_manager(iam_user_name))

@@ -221,12 +221,14 @@ class IAMClient:
                 UserName=user_name,
                 PolicyArn=policy_arn,
             )
+
             return True
         except ClientError as e:
             logging.error(
                 'IAM 유저 정책 부여 API(`attach_user_policy()`) 호출 실패 | %s',
                 e,
             )
+
             return False
 
     def detach_user_policy(
@@ -241,12 +243,14 @@ class IAMClient:
                 UserName=user_name,
                 PolicyArn=policy_arn,
             )
+
             return True
         except ClientError as e:
             logging.error(
                 'IAM 유저 정책 제거 API(`detach_user_policy()`) 호출 실패 | %s',
                 e,
             )
+
             return False
 
 
