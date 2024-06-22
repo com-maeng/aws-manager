@@ -119,65 +119,81 @@ def handle_stop_command(ack, say, command) -> bool:
 
     ack()  # 3초 이내 응답 필요
 
-    # 사용자 입력값의 가장 마지막에 인스턴스 ID가 위치한다고 가정
-    instance_id = command['text'].split()[-1]
-
     slack_id = command['user_id']
-    instance_state = ec2_client.get_instance_state(instance_id)
 
+    # 교육생 여부 및 트랙 체크
     try:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
-    except ValueError:
+
+        assert track == 'DE'
+    except ValueError as e:
         say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
-        logging.info('교육생이 아닌 사용자의 `/stop` 요청 | slack_id: %s', slack_id)
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/stop` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
 
         return False
-
-    if track != 'DE':
+    except AssertionError as e:
         say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
-        logging.info('DE 트랙 외 교육생의 `/stop` 요청 | slack_id: %s', slack_id)
-
-        return False
-
-    if instance_state != 'running':
-        say('인스턴스가 시작(running) 상태일 때만 중지할 수 있습니다.')
         logging.info(
-            '시작 상태가 아닌 인스턴스 `/stop` 요청 | 인스턴스 상태: %s',
-            instance_state
+            'DE 트랙 외 교육생의 `/stop` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
         )
 
         return False
 
-    instance_onwer = psql_client.get_slack_id_by_instance(instance_id)
+    # 소유 중인 인스턴스 조회
+    instance_id_list = psql_client.get_user_owned_instance(student_id)
 
-    if slack_id != instance_onwer:
-        say('자신의 소유의 인스턴스만 종료할 수 있습니다.')
+    if not instance_id_list:
+        say('현재 소유 중인 인스턴스가 없습니다.')
         logging.info(
-            '자신의 소유가 아닌 인스턴스 `/stop` 요청 | slack_id: %s', slack_id
+            '소유 중인 인스턴스가 없는 사용자의 `/stop` 요청 | 슬랙 ID: %s',
+            slack_id
         )
+
         return False
 
-    ec2_client.stop_instance(instance_id)
+    # `stopped` 상태로 만들 인스턴스가 하나라도 있는지 확인
+    instance_state_dict = ec2_client.get_instance_state(instance_id_list)
+    state_values = instance_state_dict.values()
 
-    today_logs = psql_client.get_today_instance_logs(instance_id)
-    remaining_time = instance_usage_manager.get_remaining_time(today_logs)
+    if not any(value == 'running' for value in state_values):
+        say('이미 모든 인스턴스가 `stopped` 상태입니다.')
+        logging.info(
+            '`stopped`로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/stop` 요청 | 인스턴스 상태: %s',
+            instance_state_dict
+        )
 
-    remain_hours, remain_minutes, _ = str(remaining_time).split(':')
+        return False
+
+    # 인스턴스 중지
+    if not ec2_client.stop_instance(instance_id_list):
+        say('알 수 없는 이유로 인스턴스 중지에 실패했습니다.')
+        logging.error('인스턴스 중지 실패 | 인스턴스 ID: %s', instance_id_list)
+
+        return False
+
+    logging.info('인스턴스 중지 | 인스턴스 ID: %s', instance_id_list)
+
+    # 성공 메시지 전송
+    remaining_tm = psql_client.get_remaining_usage_time(student_id)
     now = datetime.now(timezone('Asia/Seoul'))
-    msg = f'''
-{instance_id}를 종료했습니다.
+    msg = f'''\
+모든 인스턴스를 성공적으로 중지했습니다 🚀
+오늘의 잔여 할당량: `{remaining_tm.hour}시간 {remaining_tm.minute}분 {remaining_tm.second}초`
 
-- 오늘의 잔여 할당량: {remain_hours}시간 {remain_minutes}분 
-- 인스턴스 종료 시간: {now.strftime('%Y-%m-%d %H:%M분')}
-
-*인스턴스 사용량 초기화는 매일 자정에 진행됩니다.*
+_인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     say(msg)
     psql_client.insert_slack_user_request_log(
         student_id,
         'stop',
-        str(now)
+        str(now.strftime('%Y-%m-%d %H:%M:%S'))
     )
 
     return True
@@ -223,14 +239,14 @@ def handle_start_command(ack, say, command) -> bool:
 
         return False
 
-    # 모든 인스턴스가 `running` 상태인지 확인
+    # `running` 상태로 만들 인스턴스가 하나라도 있는지 확인
     instance_state_dict = ec2_client.get_instance_state(instance_id_list)
     state_values = instance_state_dict.values()
 
     if not any(value == 'stopped' for value in state_values):
-        say('이미 모든 인스턴스가 running 상태입니다.')
+        say('이미 모든 인스턴스가 `running` 상태입니다.')
         logging.info(
-            '모든 인스턴스의 상태가 running일 때의 `/start` 요청 | 인스턴스 상태: %s',
+            '`running`으로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/start` 요청 | 인스턴스 상태: %s',
             instance_state_dict
         )
 
