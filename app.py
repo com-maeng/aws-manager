@@ -284,12 +284,11 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
 
     say(msg)
 
-    # # 로그 데이터 적재  # TODO: UNCOMMENT ME
-    # psql_client.insert_instance_request_log(
-    #     student_id,
-    #     'start',
-    #     str(now.strftime('%Y-%m-%d %H:%M:%S'))
-    # )
+    psql_client.insert_slack_user_request_log(
+        student_id,
+        'start',
+        str(now.strftime('%Y-%m-%d %H:%M:%S'))
+    )
 
     return True
 
