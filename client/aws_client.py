@@ -203,12 +203,12 @@ class CloudTrailClient:
             region_name='ap-northeast-2',
         )
 
-    def get_event_logs_by_event_name(
+    def get_event_log_by_event_name(
         self,
         event_name: str,
         start_time: datetime,
         end_time: datetime
-    ) -> Optional[list[dict]]:
+    ) -> list[Optional[dict]]:
         ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞은 log들을 추출합니다.
 
         Args:
@@ -219,21 +219,7 @@ class CloudTrailClient:
 
         event_logs = []
 
-        response = self.client.lookup_events(
-            LookupAttributes=[
-                {
-                    'AttributeKey': 'EventName',
-                    'AttributeValue': event_name
-                }
-            ],
-            StartTime=start_time,
-            EndTime=end_time,
-            MaxResults=50,
-        )
-
-        event_logs.extend(response['Events'])
-
-        while 'NextToken' in response:
+        try:
             response = self.client.lookup_events(
                 LookupAttributes=[
                     {
@@ -244,8 +230,38 @@ class CloudTrailClient:
                 StartTime=start_time,
                 EndTime=end_time,
                 MaxResults=50,
-                NextToken=response['NextToken']
             )
+        except ClientError as e:
+            logging.error(
+                'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                event_name, e,
+            )
+
+            return []
+
+        event_logs.extend(response['Events'])
+
+        while 'NextToken' in response.keys():
+            try:
+                response = self.client.lookup_events(
+                    LookupAttributes=[
+                        {
+                            'AttributeKey': 'EventName',
+                            'AttributeValue': event_name
+                        }
+                    ],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    MaxResults=50,
+                )
+            except ClientError as e:
+                logging.error(
+                    'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                    event_name, e,
+                )
+
+                return []
+
             event_logs.extend(response['Events'])
 
         return event_logs

@@ -3,6 +3,7 @@
 
 import os
 import logging
+from datetime import datetime
 from typing import Optional
 
 import psycopg
@@ -297,7 +298,7 @@ class PSQLClient:
 
     def insert_into_cloudtrail_log(
         self,
-        logs: Optional[list[tuple[str, str, str]]]
+        logs: list[Optional[tuple[str, str, datetime]]]
     ) -> None:
         '''CloudTrail의 로그를 적재합니다.'''
 

@@ -14,10 +14,11 @@ import pytz
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
+
 sys.path.append(app_dir)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from client.aws_client import CloudTrailClient
     from client.psql_client import PSQLClient
 
@@ -25,14 +26,14 @@ if __name__ == "__main__":
     psql_client = PSQLClient()
     end_time = datetime.now(pytz.utc)
     start_time = end_time - timedelta(minutes=10)
-    logs_to_db = []
+    logs_to_insert = []
 
-    stop_logs = cloudtrail_client.get_event_logs_by_event_name(
+    stop_logs = cloudtrail_client.get_event_log_by_event_name(
         'StopInstances',
         start_time,
         end_time
     )
-    start_logs = cloudtrail_client.get_event_logs_by_event_name(
+    start_logs = cloudtrail_client.get_event_log_by_event_name(
         'StartInstances',
         start_time,
         end_time
@@ -45,6 +46,6 @@ if __name__ == "__main__":
         log_type = log.get('EventName')
         log_time = log.get('EventTime')
 
-        logs_to_db.append((instance_id, log_type, log_time))
+        logs_to_insert.append((instance_id, log_type, log_time))
 
-    psql_client.insert_into_cloudtrail_log(logs_to_db)
+    psql_client.insert_into_cloudtrail_log(logs_to_insert)
