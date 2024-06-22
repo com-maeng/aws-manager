@@ -73,20 +73,27 @@ class EC2Client:
 
             return False
 
-    def stop_instance(self, instance_id: str) -> None:
-        '''Stop the EC2 instance.'''
+    def stop_instance(
+        self,
+        instance_ids: list[str]
+    ) -> bool:
+        '''EC2 인스턴스를 중지합니다.'''
 
         try:
             self.client.stop_instances(
-                InstanceIds=[instance_id],
+                InstanceIds=instance_ids,
                 DryRun=False
             )
+
+            return True
         except ClientError as e:
             logging.error(
                 '인스턴스 중지 API (`stop_instances()`) 호출 실패 | 인스턴스 ID: %s | %s',
-                instance_id,
+                instance_ids,
                 e
             )
+
+            return False
 
     def get_live_instance_id_list(self, state: list[str]) -> list[str]:
         '''시작/중지 상태인 모든 EC2 인스턴스의 ID가 담긴 리스트를 반환합니다.'''
