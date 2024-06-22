@@ -234,7 +234,8 @@ class CloudTrailClient:
         except ClientError as e:
             logging.error(
                 'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
-                event_name, e,
+                event_name,
+                e,
             )
 
         event_logs.extend(response['Events'])
@@ -256,7 +257,8 @@ class CloudTrailClient:
             except ClientError as e:
                 logging.error(
                     'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
-                    event_name, e,
+                    event_name,
+                    e,
                 )
 
             event_logs.extend(response['Events'])
