@@ -347,7 +347,7 @@ class PSQLClient:
 
         return None
 
-    def get_today_slack_policy_log(self, student_id: int) -> int:
+    def get_policy_request_count(self, student_id: int) -> int:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
         query = '''

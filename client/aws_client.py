@@ -213,7 +213,7 @@ class IAMClient:
             self,
             user_name: str,
             policy_arn: str,
-    ) -> None:
+    ) -> bool:
         '''IAM user에게 특정 정책을 추가합니다.'''
 
         try:
@@ -221,18 +221,19 @@ class IAMClient:
                 UserName=user_name,
                 PolicyArn=policy_arn,
             )
+            return True
         except ClientError as e:
             logging.error(
                 'IAM 유저 정책 부여 API(`attach_user_policy()`) 호출 실패 | %s',
                 e,
             )
-            raise e
+            return False
 
     def detach_user_policy(
             self,
             user_name: str,
             policy_arn: str,
-    ) -> None:
+    ) -> bool:
         '''IAM user에게 특정 정책을 제거합니다.'''
 
         try:
@@ -240,12 +241,13 @@ class IAMClient:
                 UserName=user_name,
                 PolicyArn=policy_arn,
             )
+            return True
         except ClientError as e:
             logging.error(
                 'IAM 유저 정책 제거 API(`detach_user_policy()`) 호출 실패 | %s',
                 e,
             )
-            raise e
+            return False
 
 
 class CloudTrailClient:
