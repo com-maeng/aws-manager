@@ -304,7 +304,7 @@ class PSQLClient:
 
         query = '''
             SELECT 
-                name    --한글 본명
+                name  -- 한글 본명
                 , student_id
             FROM
                 student

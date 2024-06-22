@@ -13,7 +13,6 @@ if __name__ == '__main__':
 
     from client.psql_client import PSQLClient
 
-    # 해당 csv 파일 경로를 입력해야 합니다.
     CSV_FILE_PATH = './student_AWS_IAM_Username.csv'
 
     psql_client = PSQLClient()
