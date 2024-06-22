@@ -48,4 +48,5 @@ if __name__ == '__main__':
 
         logs_to_insert.append((instance_id, log_type, log_time))
 
-    psql_client.insert_into_cloudtrail_log(logs_to_insert)
+    if logs_to_insert:
+        psql_client.insert_into_cloudtrail_log(logs_to_insert)

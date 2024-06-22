@@ -208,11 +208,11 @@ class CloudTrailClient:
         event_name: str,
         start_time: datetime,
         end_time: datetime
-    ) -> list[Optional[dict]]:
+    ) -> Optional[list[dict]]:
         ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞은 log들을 추출합니다.
 
         Args:
-            event_name (str): AWS CloudTrail Event history의 Event name 입니다. 
+            event_name (str): AWS CloudTrail Event history의 Event name 입니다.
             start_time (datetime): 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
             end_time (datetime): 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
         '''
@@ -237,8 +237,6 @@ class CloudTrailClient:
                 event_name, e,
             )
 
-            return []
-
         event_logs.extend(response['Events'])
 
         while 'NextToken' in response.keys():
@@ -253,14 +251,13 @@ class CloudTrailClient:
                     StartTime=start_time,
                     EndTime=end_time,
                     MaxResults=50,
+                    NextToken=response['NextToken']
                 )
             except ClientError as e:
                 logging.error(
                     'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
                     event_name, e,
                 )
-
-                return []
 
             event_logs.extend(response['Events'])
 
