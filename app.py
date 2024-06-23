@@ -83,7 +83,7 @@ def handle_stop_command(ack, say, command) -> bool:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
 
         assert track == 'DE'
-    except ValueError as e:
+    except TypeError as e:
         say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
         logging.info(
             '교육생이 아닌 슬랙 유저의 `/stop` 요청 | 슬랙 ID: %s | %s',
@@ -169,7 +169,7 @@ def handle_start_command(ack, say, command) -> bool:
     # 교육생 여부 체크
     try:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
-    except ValueError as e:
+    except TypeError as e:
         say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 시작할 수 없습니다.')
         logging.info(
             '교육생이 아닌 슬랙 유저의 `/start` 요청 | 슬랙 ID: %s | %s',
