@@ -3,7 +3,7 @@
 
 import os
 import logging
-import datetime
+from datetime import datetime, time
 from typing import Optional
 
 import psycopg
@@ -104,7 +104,10 @@ class PSQLClient:
             (student_id, request_type, request_time)
         )
 
-    def get_latest_started_instance_id(self, student_id) -> Optional[str]:
+    def get_latest_started_instance_id(
+        self,
+        student_id
+    ) -> Optional[str]:
         '''사용자가 가장 최근에 시작(`/start`) 요청을 한 인스턴스의 ID를 반환합니다.
 
         당일 시작 요청에 대한 로그만을 조회합니다.
@@ -168,6 +171,7 @@ class PSQLClient:
 
         return fetched_data
 
+
     def get_user_owned_instance(
         self,
         student_id: str
@@ -200,7 +204,14 @@ class PSQLClient:
 
             return instance_id_list
 
-    def insert_system_logs(self, instance_id: str, log_type: str, log_time: str) -> None:
+
+    def insert_system_logs(
+        self,
+        instance_id: str,
+        log_type: str,
+        log_time: str
+    ) -> None:
+
         '''system log를 DB에 저장하는 기능 구현.'''
 
         query = '''
@@ -215,7 +226,10 @@ class PSQLClient:
             '''
         self._execute_query(query, (instance_id, log_type, log_time))
 
-    def get_today_instance_logs(self, instance_id: str) -> list[tuple[str, str]]:
+    def get_today_instance_logs(
+        self,
+        instance_id: str
+    ) -> list[tuple[str, str]]:
         '''지정된 인스턴스 ID에 대해 오늘의 로그를 DB에서 조회하여리스트로 반환합니다.
 
         로그는 'slack_user_request_log'와 'system_log' 두 테이블에서 조회함.
@@ -248,7 +262,10 @@ class PSQLClient:
 
         return self._execute_query(query, (instance_id, instance_id))
 
-    def get__student_owned_instances(self, student_id: str) -> list[tuple[str, str]]:
+    def get_student_owned_instances(
+        self,
+        student_id: str
+    ) -> list[tuple[str, int]]:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
         query = '''
@@ -270,7 +287,10 @@ class PSQLClient:
 
         return self._execute_query(query, (student_id,))
 
-    def get_slack_id_by_instance(self, instance_id: str) -> list[tuple[str,]]:
+    def get_slack_id_by_instance(
+        self,
+        instance_id: str
+    ) -> list[tuple[str, str]]:
         '''해당 인스턴스 id를 가지고 있는 학생의 slack id의 값을 반환합니다.'''
 
         query = '''
@@ -297,10 +317,32 @@ class PSQLClient:
 
         return None
 
+
+    def insert_into_cloudtrail_log(
+        self,
+        logs: list[tuple[str, str, datetime]]
+    ) -> None:
+        '''CloudTrail의 로그를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                cloudtrail_log (instance_id, log_type, log_time)
+            VALUES
+                (%s, %s, %s)
+            ON 
+                CONFLICT (instance_id, log_type, log_time) 
+            DO 
+                NOTHING
+            ;
+        '''
+
+        self._execute_query(query, (logs, ), many=True)
+
+
     def get_remaining_usage_time(
         self,
         student_id: str
-    ) -> datetime.time:
+    ) -> time:
         '''사용자의 잔여 인스턴스 사용 할당량을 반환합니다.'''
 
         query = '''
