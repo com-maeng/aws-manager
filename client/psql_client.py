@@ -323,3 +323,16 @@ class PSQLClient:
         remaining_tm = ret[0][0]
 
         return remaining_tm
+
+    def reset_usage_quota(self, maximum_quota: int) -> None:
+        '''인스턴스 사용 할당량을 최대 할당량으로 초기화합니다.'''
+
+        query = '''
+            UPDATE
+                ec2_usage_quota
+            SET
+                remaining_time = %s
+            ;
+        '''
+
+        self._execute_query(query, (maximum_quota,))
