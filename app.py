@@ -289,6 +289,7 @@ def handle_policy_command(ack, say, command) -> bool:
 
     if not policy_reqeust_count:
         say('데이터를 불러오는 중에 문제가 발생했습니다. 관리자에게 문의해주세요!')
+        logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
 
         return False
 
@@ -314,6 +315,7 @@ def handle_policy_command(ack, say, command) -> bool:
         # 접근 권한 부여
         if not iam_client.attach_user_policy(iam_user_name, STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 부여 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+            logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
 
             return False
 

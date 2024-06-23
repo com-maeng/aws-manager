@@ -327,7 +327,7 @@ class PSQLClient:
 
     def get_iam_user_name(
         self,
-        student_id: str
+        student_id: int
     ) -> Optional[str]:
         '''iam_user table 에서 user_name을 반환합니다.'''
 
@@ -345,8 +345,6 @@ class PSQLClient:
 
         if fetched_data:
             return fetched_data[0][0]
-
-        return None
 
     def get_policy_request_count(self, student_id: int) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''

@@ -210,9 +210,9 @@ class IAMClient:
             raise e
 
     def attach_user_policy(
-            self,
-            user_name: str,
-            policy_arn: str,
+        self,
+        user_name: str,
+        policy_arn: str,
     ) -> bool:
         '''IAM user에게 특정 정책을 추가합니다.'''
 
@@ -232,9 +232,9 @@ class IAMClient:
             return False
 
     def detach_user_policy(
-            self,
-            user_name: str,
-            policy_arn: str,
+        self,
+        user_name: str,
+        policy_arn: str,
     ) -> bool:
         '''IAM user에게 특정 정책을 제거합니다.'''
 
