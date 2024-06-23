@@ -6,7 +6,9 @@ import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..'))
+
 sys.path.append(app_dir)
+
 
 if __name__ == '__main__':
     import csv
@@ -18,7 +20,6 @@ if __name__ == '__main__':
     psql_client = PSQLClient()
     student_info = psql_client.get_name_and_student_id()
     student_info_dict = dict(student_info)
-
     data_to_db = []
 
     with open(CSV_FILE_PATH, mode='r', newline='', encoding='utf-8') as file:
