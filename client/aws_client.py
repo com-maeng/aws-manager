@@ -238,6 +238,8 @@ class CloudTrailClient:
                 e,
             )
 
+            return None
+
         event_logs.extend(response['Events'])
 
         while 'NextToken' in response.keys():
@@ -260,6 +262,8 @@ class CloudTrailClient:
                     event_name,
                     e,
                 )
+
+                return None
 
             event_logs.extend(response['Events'])
 

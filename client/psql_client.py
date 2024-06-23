@@ -244,7 +244,7 @@ class PSQLClient:
     def get_student_owned_instances(
         self,
         student_id: str
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, int]]:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
         query = '''

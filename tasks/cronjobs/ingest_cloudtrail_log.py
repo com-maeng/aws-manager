@@ -6,6 +6,7 @@
 
 
 import os
+import logging
 import sys
 from datetime import datetime, timedelta
 
@@ -39,6 +40,14 @@ if __name__ == '__main__':
         end_time
     )
 
+    if not (stop_logs and start_logs):
+        logging.error(
+            'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다. | %s | %s',
+            start_logs,
+            stop_logs
+        )
+        sys.exit(1)
+
     total_logs = stop_logs + start_logs
 
     for log in total_logs:
@@ -50,3 +59,7 @@ if __name__ == '__main__':
 
     if logs_to_insert:
         psql_client.insert_into_cloudtrail_log(logs_to_insert)
+        logging.info(
+            'AWS CloudTrail Log Data 적재 성공 | %s',
+            logs_to_insert
+        )
