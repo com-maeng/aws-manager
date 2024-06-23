@@ -318,6 +318,40 @@ class PSQLClient:
         return None
 
 
+    def get_name_and_student_id(self) -> list[tuple[str, int]]:
+        '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
+
+        query = '''
+            SELECT 
+                name  -- 한글 본명
+                , student_id
+            FROM
+                student
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
+
+
+    def insert_into_iam_user(
+        self,
+        iam_user_data: list[tuple[str, int]]
+    ) -> None:
+        '''iam_user 테이블에 데이터를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                iam_user (user_name, owned_by)
+            VALUES
+                (%s, %s)
+            ;
+        '''
+
+        self._execute_query(query, (iam_user_data, ), many=True)
+
+
     def insert_into_cloudtrail_log(
         self,
         logs: list[tuple[str, str, datetime]]
