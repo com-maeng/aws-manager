@@ -3,6 +3,7 @@
 
 import os
 import logging
+from datetime import datetime, time
 from typing import Optional
 
 import psycopg
@@ -62,7 +63,7 @@ class PSQLClient:
         self,
         slack_id: str
     ) -> Optional[tuple[str, str]]:
-        '''사용자의 정보를 반환합니다.'''
+        '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보를 반환합니다.'''
 
         query = '''
             SELECT
@@ -74,18 +75,14 @@ class PSQLClient:
                 slack_id = %s
             ;
         '''
-
         fetched_data = self._execute_query(query, (slack_id,))
 
         if fetched_data:
             return fetched_data[0]
 
-        return None
-
     def insert_instance_request_log(
         self,
         student_id: str,
-        instance_id: str,
         request_type: str,
         request_time: str
     ) -> None:
@@ -95,20 +92,22 @@ class PSQLClient:
             INSERT INTO
                 slack_user_request_log (
                     request_user
-                    , instance_id
                     , request_type
                     , request_time
                 )
             VALUES
-                (%s, %s, %s, %s)
+                (%s, %s, %s)
             ;
         '''
         self._execute_query(
             query,
-            (student_id, instance_id, request_type, request_time)
+            (student_id, request_type, request_time)
         )
 
-    def get_latest_started_instance_id(self, student_id) -> Optional[str]:
+    def get_latest_started_instance_id(
+        self,
+        student_id
+    ) -> Optional[str]:
         '''사용자가 가장 최근에 시작(`/start`) 요청을 한 인스턴스의 ID를 반환합니다.
 
         당일 시작 요청에 대한 로그만을 조회합니다.
@@ -172,8 +171,12 @@ class PSQLClient:
 
         return fetched_data
 
-    def get_owned_instance(self, slack_id: str) -> Optional[list[tuple[str]]]:
-        '''사용자의 slack_id를 활용하여 사용자 소유의 인스턴스의 ID를 반환합니다.'''
+
+    def get_user_owned_instance(
+        self,
+        student_id: str
+    ) -> Optional[list[str]]:
+        '''특정 사용자 소유의 모든 인스턴스에 대한 ID를 반환합니다.'''
 
         query = '''
             SELECT
@@ -181,28 +184,34 @@ class PSQLClient:
             FROM
                 ownership_info
             WHERE
-                owner = (
+                owned_by = (
                     SELECT
-                        iam_username
+                        user_id
                     FROM
-                        student
+                        iam_user
                     WHERE
-                        slack_id = %s
+                        owned_by = %s
                 )
             ;
         '''
-
-        fetched_data = self._execute_query(query, (slack_id,))
+        fetched_data = self._execute_query(query, (student_id,))
 
         if fetched_data:
             instance_id_list = []
 
             for d in fetched_data:
-                instance_id_list.append(d[0])  # instance_id
+                instance_id_list.append(d[0])  # `instance_id`
 
             return instance_id_list
 
-    def insert_system_logs(self, instance_id: str, log_type: str, log_time: str) -> None:
+
+    def insert_system_logs(
+        self,
+        instance_id: str,
+        log_type: str,
+        log_time: str
+    ) -> None:
+
         '''system log를 DB에 저장하는 기능 구현.'''
 
         query = '''
@@ -217,7 +226,10 @@ class PSQLClient:
             '''
         self._execute_query(query, (instance_id, log_type, log_time))
 
-    def get_today_instance_logs(self, instance_id: str) -> list[tuple[str, str]]:
+    def get_today_instance_logs(
+        self,
+        instance_id: str
+    ) -> list[tuple[str, str]]:
         '''지정된 인스턴스 ID에 대해 오늘의 로그를 DB에서 조회하여리스트로 반환합니다.
 
         로그는 'slack_user_request_log'와 'system_log' 두 테이블에서 조회함.
@@ -250,7 +262,10 @@ class PSQLClient:
 
         return self._execute_query(query, (instance_id, instance_id))
 
-    def get__student_owned_instances(self, student_id: str) -> list[tuple[str, str]]:
+    def get_student_owned_instances(
+        self,
+        student_id: str
+    ) -> list[tuple[str, int]]:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
         query = '''
@@ -272,7 +287,10 @@ class PSQLClient:
 
         return self._execute_query(query, (student_id,))
 
-    def get_slack_id_by_instance(self, instance_id: str) -> list[tuple[str,]]:
+    def get_slack_id_by_instance(
+        self,
+        instance_id: str
+    ) -> list[tuple[str, str]]:
         '''해당 인스턴스 id를 가지고 있는 학생의 slack id의 값을 반환합니다.'''
 
         query = '''
@@ -299,6 +317,7 @@ class PSQLClient:
 
         return None
 
+
     def get_name_and_student_id(self) -> list[tuple[str, int]]:
         '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
 
@@ -315,6 +334,7 @@ class PSQLClient:
 
         return fetched_data
 
+
     def insert_into_iam_user(
         self,
         iam_user_data: list[tuple[str, int]]
@@ -330,3 +350,52 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (iam_user_data, ), many=True)
+
+
+    def insert_into_cloudtrail_log(
+        self,
+        logs: list[tuple[str, str, datetime]]
+    ) -> None:
+        '''CloudTrail의 로그를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                cloudtrail_log (instance_id, log_type, log_time)
+            VALUES
+                (%s, %s, %s)
+            ON 
+                CONFLICT (instance_id, log_type, log_time) 
+            DO 
+                NOTHING
+            ;
+        '''
+
+        self._execute_query(query, (logs, ), many=True)
+
+
+    def get_remaining_usage_time(
+        self,
+        student_id: str
+    ) -> time:
+        '''사용자의 잔여 인스턴스 사용 할당량을 반환합니다.'''
+
+        query = '''
+            SELECT
+                remaining_time
+            FROM
+                ec2_usage_quota
+            WHERE
+                iam_user_id = (
+                    SELECT
+                        user_id
+                    FROM
+                        iam_user
+                    WHERE
+                        owned_by = %s
+                )
+            ;
+        '''
+        ret = self._execute_query(query, (student_id,))
+        remaining_tm = ret[0][0]
+
+        return remaining_tm

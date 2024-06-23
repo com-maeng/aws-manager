@@ -22,47 +22,78 @@ class EC2Client:
             region_name='ap-northeast-2',
         )
 
-    def get_instance_state(self, instance_id: Optional[str]) -> Optional[str]:
-        '''Get the current state of the EC2 instance.'''
+    def get_instance_state(
+        self,
+        instance_ids: list[str]
+    ) -> Optional[dict[str, str]]:
+        '''AWS API를 호출하여 인스턴스의 상태를 반환합니다.'''
 
         try:
-            resp = self.client.describe_instances(InstanceIds=[instance_id])
-            state = resp['Reservations'][0]['Instances'][0]['State']['Name']
-
-            return state
+            resp_dict = self.client.describe_instances(
+                InstanceIds=instance_ids
+            )
         except ClientError as e:
             logging.error(
-                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID: %s | %s', instance_id, e)
+                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID 목록: %s | %s',
+                instance_ids,
+                e
+            )
 
-    def start_instance(self, instance_id: str) -> None:
-        '''Start the EC2 instance.'''
+            return None
+
+        instance_state_dict = {}
+
+        for r in resp_dict['Reservations']:
+            instance_id = r['Instances'][0]['InstanceId']
+            state = r['Instances'][0]['State']['Name']
+
+            instance_state_dict[instance_id] = state
+
+        return instance_state_dict
+
+    def start_instance(
+        self,
+        instance_ids: list[str]
+    ) -> bool:
+        '''EC2 인스턴스를 시작합니다.'''
 
         try:
             self.client.start_instances(
-                InstanceIds=[instance_id],
+                InstanceIds=instance_ids,
                 DryRun=False
             )
+
+            return True
         except ClientError as e:
             logging.error(
                 '인스턴스 시작 API (`start_instances()`) 호출 실패 | 인스턴스 ID: %s | %s',
-                instance_id,
+                instance_ids,
                 e
             )
 
-    def stop_instance(self, instance_id: str) -> None:
-        '''Stop the EC2 instance.'''
+            return False
+
+    def stop_instance(
+        self,
+        instance_ids: list[str]
+    ) -> bool:
+        '''EC2 인스턴스를 중지합니다.'''
 
         try:
             self.client.stop_instances(
-                InstanceIds=[instance_id],
+                InstanceIds=instance_ids,
                 DryRun=False
             )
+
+            return True
         except ClientError as e:
             logging.error(
                 '인스턴스 중지 API (`stop_instances()`) 호출 실패 | 인스턴스 ID: %s | %s',
-                instance_id,
+                instance_ids,
                 e
             )
+
+            return False
 
     def get_live_instance_id_list(self, state: list[str]) -> list[str]:
         '''시작/중지 상태인 모든 EC2 인스턴스의 ID가 담긴 리스트를 반환합니다.'''
@@ -187,7 +218,7 @@ class IAMClient:
 
 
 class CloudTrailClient:
-    '''CloudTrail 클라이언트로 인스턴스의 소유자 정보 확인하는 기능을 제공합니다.'''
+    '''AWS CloudTrail API를 활용하는 작업을 모두 구현합니다.'''
 
     def __init__(self):
         self.client = boto3.client(
@@ -198,37 +229,71 @@ class CloudTrailClient:
             region_name='ap-northeast-2',
         )
 
-    def get_runinstance_events(
+    def get_event_log_by_event_name(
         self,
+        event_name: str,
         start_time: datetime,
-        end_time: datetime,
-    ) -> list[dict]:
-        ''' 지정된 시간 범위에 생성된 Runinstances 로그들을 추출합니다.'''
+        end_time: datetime
+    ) -> Optional[list[dict]]:
+        ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞은 log들을 추출합니다.
 
-        runinstance_events = []
-        response = self.client.lookup_events(
-            LookupAttributes=[
-                {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
-            ],
-            StartTime=start_time,
-            EndTime=end_time,
-            MaxResults=50,
-        )
-        runinstance_events.extend(response['Events'])
+        Args:
+            event_name (str): AWS CloudTrail Event history의 Event name 입니다.
+            start_time (datetime): 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+            end_time (datetime): 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+        '''
 
-        while 'NextToken' in response:
+        event_logs = []
+
+        try:
             response = self.client.lookup_events(
                 LookupAttributes=[
-                    {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
+                    {
+                        'AttributeKey': 'EventName',
+                        'AttributeValue': event_name
+                    }
                 ],
                 StartTime=start_time,
                 EndTime=end_time,
                 MaxResults=50,
-                NextToken=response['NextToken']
             )
-            runinstance_events.extend(response['Events'])
+        except ClientError as e:
+            logging.error(
+                'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                event_name,
+                e,
+            )
 
-        return runinstance_events
+            return None
+
+        event_logs.extend(response['Events'])
+
+        while 'NextToken' in response.keys():
+            try:
+                response = self.client.lookup_events(
+                    LookupAttributes=[
+                        {
+                            'AttributeKey': 'EventName',
+                            'AttributeValue': event_name
+                        }
+                    ],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    MaxResults=50,
+                    NextToken=response['NextToken']
+                )
+            except ClientError as e:
+                logging.error(
+                    'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                    event_name,
+                    e,
+                )
+
+                return None
+
+            event_logs.extend(response['Events'])
+
+        return event_logs
 
     def get_instance_owner_info(
         self,
