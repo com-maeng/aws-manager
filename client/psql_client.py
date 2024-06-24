@@ -394,3 +394,67 @@ class PSQLClient:
         fetched_data = self._execute_query(query)
 
         return fetched_data
+
+    def get_iam_user_ids_with_no_remaining_time(self) -> Optional[list[tuple[int]]]:
+        '''ec2 사용시간을 모두 사용한 iam_user_id 데이터를 추출합니다.'''
+
+        query = '''
+            SELECT
+                iam_user_id
+            FROM
+                ec2_usage_quota
+            WHERE
+                remaining_time = '00:00:00'
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
+
+    def get_instance_ids_for_owner(
+        self,
+        iam_user_ids: list[int]
+    ) -> Optional[list[tuple[str, int]]]:
+        '''주어진 사용자들이 소유하고 있는 인스턴스 ID를 모두 추출합니다.'''
+
+        query = '''
+            SELECT
+                instance_id,
+                owned_by
+            FROM
+                ownership_info
+            WHERE
+                owned_by = ANY(%s)
+        '''
+
+        fetched_data = self._execute_query(query, (iam_user_ids,))
+
+        return fetched_data
+
+    def get_slack_id_by_iam_user_id(
+        self,
+        iam_user_ids: list[int]
+    ):
+        '''iam user 테이블의 user_id를 통해 교육생의 slcak id를 추출합니다.'''
+
+        query = '''
+            SELECT
+                slack_id
+            FROM
+                student
+            WHERE
+                student_id IN (
+                    SELECT
+                        owned_by
+                    FROM
+                        iam_user
+                    WHERE
+                        user_id = ANY(%s)
+                )
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (iam_user_ids,))
+
+        return fetched_data
