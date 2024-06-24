@@ -134,18 +134,24 @@ class PSQLClient:
 
         return None
 
-    def insert_into_ownership(
+    def insert_into_ownership_info(
         self,
-        owner_info_list: list[tuple[str, str]]
+        owner_info_list: list[tuple[int, str]]
     ) -> None:
         '''사용자의 instance 소유 정보를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO
-                ownership_info (owner, instance_id)
+                ownership_info (
+                    owned_by
+                    , instance_id
+                )
             VALUES
                 (%s, %s)
-            ;
+            ON 
+                CONFLICT (instance_id) 
+            DO 
+                NOTHING
         '''
 
         self._execute_query(query, (owner_info_list,), many=True)
@@ -170,7 +176,6 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (instance_id_list,))
 
         return fetched_data
-
 
     def get_user_owned_instance(
         self,
@@ -204,14 +209,12 @@ class PSQLClient:
 
             return instance_id_list
 
-
     def insert_system_logs(
         self,
         instance_id: str,
         log_type: str,
         log_time: str
     ) -> None:
-
         '''system log를 DB에 저장하는 기능 구현.'''
 
         query = '''
@@ -317,7 +320,6 @@ class PSQLClient:
 
         return None
 
-
     def get_name_and_student_id(self) -> list[tuple[str, int]]:
         '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
 
@@ -334,7 +336,6 @@ class PSQLClient:
 
         return fetched_data
 
-
     def insert_into_iam_user(
         self,
         iam_user_data: list[tuple[str, int]]
@@ -350,7 +351,6 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (iam_user_data, ), many=True)
-
 
     def insert_into_cloudtrail_log(
         self,
@@ -371,7 +371,6 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (logs, ), many=True)
-
 
     def get_remaining_usage_time(
         self,
@@ -399,3 +398,19 @@ class PSQLClient:
         remaining_tm = ret[0][0]
 
         return remaining_tm
+
+    def get_iam_user(self) -> Optional[list[tuple]]:
+        '''iam_user table에 있는 데이터를 추출합니다.'''
+
+        query = '''
+            SELECT 
+                user_name
+                , user_id
+            FROM
+                iam_user
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data

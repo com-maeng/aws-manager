@@ -294,22 +294,3 @@ class CloudTrailClient:
             event_logs.extend(response['Events'])
 
         return event_logs
-
-    def get_instance_owner_info(
-        self,
-        runinstance_events: list[dict]
-    ) -> list[tuple[str, str]]:
-        '''Log들 중 instance id와 instance의 소유권 정보를 추출'''
-
-        owner_info_list = []
-
-        for event in runinstance_events:
-            user_name = event['Username']
-            for resource in event['Resources']:
-                if resource['ResourceType'] == 'AWS::EC2::Instance':
-                    instance_id = resource['ResourceName']
-                    break
-
-            owner_info_list.append((user_name, instance_id))
-
-        return owner_info_list
