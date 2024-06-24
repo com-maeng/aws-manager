@@ -209,26 +209,6 @@ class PSQLClient:
 
             return instance_id_list
 
-    def insert_system_logs(
-        self,
-        instance_id: str,
-        log_type: str,
-        log_time: str
-    ) -> None:
-        '''system log를 DB에 저장하는 기능 구현.'''
-
-        query = '''
-            INSERT INTO
-                system_log(
-                    instance_id
-                    , log_type
-                    , log_time)
-            VALUES
-                (%s, %s, %s)
-            ;
-            '''
-        self._execute_query(query, (instance_id, log_type, log_time))
-
     def get_today_instance_logs(
         self,
         instance_id: str
