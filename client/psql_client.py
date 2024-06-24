@@ -62,7 +62,7 @@ class PSQLClient:
     def get_track_and_student_id(
         self,
         slack_id: str
-    ) -> Optional[tuple[str, str]]:
+    ) -> Optional[tuple[str, int]]:
         '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보를 반환합니다.'''
 
         query = '''
@@ -75,6 +75,7 @@ class PSQLClient:
                 slack_id = %s
             ;
         '''
+
         fetched_data = self._execute_query(query, (slack_id,))
 
         if fetched_data:
@@ -114,15 +115,15 @@ class PSQLClient:
         '''
 
         query = '''
-            SELECT 
+            SELECT
                 instance_id
-            FROM 
+            FROM
                 slack_user_request_log
-            WHERE 
+            WHERE
                 request_type = 'start'
                 AND request_user = %s
             ORDER BY
-                request_time DESC 
+                request_time DESC
             LIMIT
                 1
             ;
@@ -142,7 +143,10 @@ class PSQLClient:
 
         query = '''
             INSERT INTO
-                ownership_info (owner, instance_id)
+                ownership_info (
+                    owner
+                    , instance_id
+                )
             VALUES
                 (%s, %s)
             ;
@@ -170,7 +174,6 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (instance_id_list,))
 
         return fetched_data
-
 
     def get_user_owned_instance(
         self,
@@ -204,14 +207,12 @@ class PSQLClient:
 
             return instance_id_list
 
-
     def insert_system_logs(
         self,
         instance_id: str,
         log_type: str,
         log_time: str
     ) -> None:
-
         '''system log를 DB에 저장하는 기능 구현.'''
 
         query = '''
@@ -269,13 +270,13 @@ class PSQLClient:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
         query = '''
-            SELECT 
+            SELECT
                 instance_id
-            FROM 
+            FROM
                 ownership_info
-            WHERE 
+            WHERE
                 owner = (
-                    SELECT 
+                    SELECT
                         iam_username,
                     FROM
                         student
@@ -317,12 +318,11 @@ class PSQLClient:
 
         return None
 
-
     def get_name_and_student_id(self) -> list[tuple[str, int]]:
         '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
 
         query = '''
-            SELECT 
+            SELECT
                 name  -- 한글 본명
                 , student_id
             FROM
@@ -333,7 +333,6 @@ class PSQLClient:
         fetched_data = self._execute_query(query)
 
         return fetched_data
-
 
     def insert_into_iam_user(
         self,
@@ -350,7 +349,6 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (iam_user_data, ), many=True)
-
 
     def insert_into_cloudtrail_log(
         self,
@@ -371,7 +369,6 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (logs, ), many=True)
-
 
     def get_remaining_usage_time(
         self,
@@ -399,3 +396,45 @@ class PSQLClient:
         remaining_tm = ret[0][0]
 
         return remaining_tm
+
+    def get_iam_user_name(
+        self,
+        student_id: int
+    ) -> Optional[list[tuple[str]]]:
+        '''iam_user table 에서 user_name을 반환합니다.'''
+
+        query = '''
+            SELECT
+                user_name
+            FROM
+                iam_user
+            WHERE
+                owned_by = %s
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (student_id,))
+
+        return fetched_data
+
+    def get_policy_request_count(
+        self,
+        student_id: int
+    ) -> Optional[int]:
+        '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
+
+        query = '''
+            SELECT 
+                COUNT(*)
+            FROM 
+                slack_user_request_log
+            WHERE 
+                request_type = 'policy'
+                AND request_user = %s
+                AND request_time::DATE = CURRENT_DATE
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (student_id,))
+
+        return fetched_data

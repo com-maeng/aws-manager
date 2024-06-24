@@ -177,6 +177,7 @@ class IAMClient:
                 'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
             region_name='ap-northeast-2',
         )
+        self.STUDENT_POLICY_ARN = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'  # pylint: disable=invalid-name
 
     def detach_policy_from_group(
             self,
@@ -215,6 +216,50 @@ class IAMClient:
                 e,
             )
             raise e
+
+    def attach_user_policy(
+        self,
+        user_name: str,
+        policy_arn: str,
+    ) -> bool:
+        '''IAM user에게 특정 정책을 추가합니다.'''
+
+        try:
+            self.client.attach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+
+            return True
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 부여 API(`attach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+
+            return False
+
+    def detach_user_policy(
+        self,
+        user_name: str,
+        policy_arn: str,
+    ) -> bool:
+        '''IAM user에게 특정 정책을 제거합니다.'''
+
+        try:
+            self.client.detach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+
+            return True
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 제거 API(`detach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+
+            return False
 
 
 class CloudTrailClient:
