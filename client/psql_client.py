@@ -404,67 +404,40 @@ class PSQLClient:
 
         return fetched_data
 
-    def get_iam_user_ids_with_no_remaining_time(self) -> Optional[list[tuple[int]]]:
-        '''ec2 사용시간을 모두 사용한 iam_user_id 데이터를 추출합니다.'''
+    def get_slack_id_and_instance_id_with_no_remaining_time(self) -> Optional[list[tuple[str, str]]]:
+        '''ec2 사용시간을 모두 사용한 학생의 슬랙 아이디, 소유한 인스턴스들을 추출합니다.'''
 
         query = '''
-            SELECT
-                iam_user_id
+            SELECT 
+                s.slack_id, owner.INSTANCE_ID 
             FROM
-                ec2_usage_quota
-            WHERE
-                remaining_time = '00:00:00'
+                student AS s
+            JOIN
+                (
+                SELECT
+                    *
+                FROM
+                    iam_user
+                WHERE
+                    user_id = (
+                        SELECT
+                            iam_user_id
+                        FROM
+                            ec2_usage_quota
+                        WHERE
+                            remaining_time = '00:00:00'
+                    )
+                ) AS zero_time_user
+            ON
+                s.student_id = zero_time_user.owned_by
+            JOIN 
+                ownership_info AS owner
+            ON 
+                zero_time_user.user_id = owner.owned_by
             ;
         '''
 
         fetched_data = self._execute_query(query)
-
-        return fetched_data
-
-    def get_instance_ids_for_owner(
-        self,
-        iam_user_ids: list[int]
-    ) -> Optional[list[tuple[str, int]]]:
-        '''주어진 사용자들이 소유하고 있는 인스턴스 ID를 모두 추출합니다.'''
-
-        query = '''
-            SELECT
-                instance_id,
-                owned_by
-            FROM
-                ownership_info
-            WHERE
-                owned_by = ANY(%s)
-        '''
-
-        fetched_data = self._execute_query(query, (iam_user_ids,))
-
-        return fetched_data
-
-    def get_slack_id_by_iam_user_id(
-        self,
-        iam_user_ids: list[int]
-    ):
-        '''iam user 테이블의 user_id를 통해 교육생의 slcak id를 추출합니다.'''
-
-        query = '''
-            SELECT
-                slack_id
-            FROM
-                student
-            WHERE
-                student_id IN (
-                    SELECT
-                        owned_by
-                    FROM
-                        iam_user
-                    WHERE
-                        user_id = ANY(%s)
-                )
-            ;
-        '''
-
-        fetched_data = self._execute_query(query, (iam_user_ids,))
 
         return fetched_data
 
@@ -507,21 +480,5 @@ class PSQLClient:
         '''
 
         fetched_data = self._execute_query(query, (student_id,))
-
-        return fetched_data
-
-    def get_iam_user(self) -> Optional[list[tuple]]:
-        '''iam_user table에 있는 데이터를 추출합니다.'''
-
-        query = '''
-            SELECT 
-                user_name
-                , user_id
-            FROM
-                iam_user
-            ;
-        '''
-
-        fetched_data = self._execute_query(query)
 
         return fetched_data
