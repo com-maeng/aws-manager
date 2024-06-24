@@ -24,6 +24,8 @@ class PSQLClient:
         params: tuple = None,
         many: bool = False
     ) -> Optional[list[tuple[str]]]:
+        fetched_data = []
+
         try:
             with psycopg.connect(  # pylint: disable=not-context-manager
                 host=self.host,
@@ -39,9 +41,13 @@ class PSQLClient:
                         cur.execute(query, params)
 
                     if query.split()[0] == 'SELECT':
-                        return cur.fetchall()
+                        fetched_data = cur.fetchall()
         except psycopg.Error as e:
-            logging.error('쿼리 실행 실패 | query: %s | error: %s', query, e)
+            logging.error('쿼리 실행 실패 | %s', e)
+
+            raise e
+
+        return fetched_data
 
     def insert_into_student(
         self,
@@ -62,7 +68,7 @@ class PSQLClient:
     def get_track_and_student_id(
         self,
         slack_id: str
-    ) -> Optional[tuple[str, str]]:
+    ) -> Optional[tuple[str, int]]:
         '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보를 반환합니다.'''
 
         query = '''
@@ -75,10 +81,13 @@ class PSQLClient:
                 slack_id = %s
             ;
         '''
+
         fetched_data = self._execute_query(query, (slack_id,))
 
         if fetched_data:
             return fetched_data[0]
+
+        return None
 
     def insert_instance_request_log(
         self,
@@ -99,7 +108,6 @@ class PSQLClient:
                 (%s, %s, %s)
             ;
         '''
-
         self._execute_query(
             query,
             (student_id, request_type, request_time)
@@ -143,7 +151,10 @@ class PSQLClient:
 
         query = '''
             INSERT INTO
-                ownership_info (owner, instance_id)
+                ownership_info (
+                    owner
+                    , instance_id
+                )
             VALUES
                 (%s, %s)
             ;
@@ -171,7 +182,6 @@ class PSQLClient:
         fetched_data = self._execute_query(query, (instance_id_list,))
 
         return fetched_data
-
 
     def get_user_owned_instance(
         self,
@@ -205,14 +215,12 @@ class PSQLClient:
 
             return instance_id_list
 
-
     def insert_system_logs(
         self,
         instance_id: str,
         log_type: str,
         log_time: str
     ) -> None:
-
         '''system log를 DB에 저장하는 기능 구현.'''
 
         query = '''
@@ -318,7 +326,6 @@ class PSQLClient:
 
         return None
 
-
     def insert_into_cloudtrail_log(
         self,
         logs: list[tuple[str, str, datetime]]
@@ -338,7 +345,6 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (logs, ), many=True)
-
 
     def get_remaining_usage_time(
         self,
@@ -385,10 +391,12 @@ class PSQLClient:
 
         fetched_data = self._execute_query(query, (student_id,))
 
-        if fetched_data:
-            return fetched_data[0][0]
+        return fetched_data
 
-    def get_policy_request_count(self, student_id: int) -> Optional[int]:
+    def get_policy_request_count(
+        self,
+        student_id: int
+    ) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
         query = '''

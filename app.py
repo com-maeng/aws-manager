@@ -5,7 +5,7 @@ Example:
 '''
 
 
-import asyncio
+import threading
 import logging
 from datetime import datetime, timedelta, time
 
@@ -286,8 +286,9 @@ def handle_policy_command(ack, say, command) -> bool:
     try:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
 
-    except ValueError as e:
-        say('이어드림스쿨 4기 교육생이 아니면 AWS 콘솔 접근 권한을 부여받을 수 없습니다.')
+        assert track == 'DE'
+    except TypeError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
         logging.info(
             '교육생이 아닌 슬랙 유저의 `/policy` 요청 | 슬랙 ID: %s | %s',
             slack_id,
@@ -295,11 +296,13 @@ def handle_policy_command(ack, say, command) -> bool:
         )
 
         return False
-
-    # DE 트랙 교육생 여부 체크
-    if track != 'DE':
-        say('현재는 DE 트랙 교육생이 아니면 AWS 콘솔 접근 권한을 부여받을 수 없습니다.')
-        logging.info('DE 트랙 외 교육생의 `/policy` 요청 | 슬랙 ID: %s', slack_id)
+    except AssertionError as e:
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
+        logging.info(
+            'DE 트랙 외 교육생의 `/policy` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
 
         return False
 
@@ -311,7 +314,7 @@ def handle_policy_command(ack, say, command) -> bool:
 
         return False
 
-    if policy_reqeust_count[0][0] > 4:
+    if policy_reqeust_count[0][0] >= 4:
         msg = '''\
 오늘은 더이상 임시 콘솔 접근 권한을 요청할 수 없습니다.:melting_face:
 임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. 
@@ -327,41 +330,41 @@ def handle_policy_command(ack, say, command) -> bool:
 
         return False
 
-    async def access_permissions_manager(iam_user_name: str) -> None:
-        STUDENT_POLICY_ARN = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'  # pylint: disable=invalid-name
+    def grant_aws_console_access(iam_user_name: str) -> bool:
 
-        # 접근 권한 부여
-        if not iam_client.attach_user_policy(iam_user_name, STUDENT_POLICY_ARN):
+        if not iam_client.attach_user_policy(iam_user_name, iam_client.STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 부여 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
-            logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
+            logging.info(
+                '`/policy` 요청에서의 AWS IAM client 호출 오류 | 슬랙 ID: %s', slack_id)
 
             return False
 
         msg = '''\
 AWS 콘솔 접근 권한을 드렸습니다. 🚀
 지금부터 15분간 AWS콘솔에 접근할 수 있습니다. 
-        '''
+'''
 
         say(msg)
 
-        # 로그 데이터 적재
         psql_client.insert_instance_request_log(
             student_id,
             'policy',
             str(now.strftime('%Y-%m-%d %H:%M:%S'))
         )
 
-        await asyncio.sleep(900)
+        return True
 
-        # 접근 권한 회수
-        if not iam_client.detach_user_policy(iam_user_name, STUDENT_POLICY_ARN):
+    def revoke_aws_console_access(iam_user_name: str) -> bool:
+        if not iam_client.detach_user_policy(iam_user_name, iam_client.STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 회수 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+            logging.info(
+                '`/policy` 요청에서의 AWS IAM client 호출 오류 | 슬랙 ID: %s', slack_id)
 
             return False
 
         msg = f'''\
 15분이 경과하여 콘솔 접근 권한이 회수되었습니다. :smiling_face_with_tear:
-⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count}번 남았습니다.
+⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count[0][0]}번 남았습니다.
 '''
 
         say(msg)
@@ -370,9 +373,24 @@ AWS 콘솔 접근 권한을 드렸습니다. 🚀
 
     iam_user_name = psql_client.get_iam_user_name(student_id)
 
-    if iam_user_name:
-        # 비동기 함수 호출 및 실행
-        asyncio.run(access_permissions_manager(iam_user_name))
+    if not iam_user_name:
+        say('IAM User 정보를 불러오는 중 문제가 발생했습니다. 관리자에게 문의해주세요!')
+        logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    if len(iam_user_name[0]) == 0:
+        say('IAM USER 계정이 부여되지 않은 교육생입니다. 관리자에게 문의해주세요!')
+        logging.info('IAM 계정이 없는 교육생의 `/policy` 요청 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    grant_aws_console_access(iam_user_name[0][0])
+    policy_timer = threading.Timer(
+        900,
+        revoke_aws_console_access(iam_user_name[0][0])
+    )
+    policy_timer.start()
 
     return True
 
