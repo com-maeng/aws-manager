@@ -316,7 +316,7 @@ def handle_policy_command(ack, say, command) -> bool:
     if policy_reqeust_count[0][0] >= 4:
         msg = '''\
 오늘은 더이상 임시 콘솔 접근 권한을 요청할 수 없습니다.:melting_face:
-임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. 
+임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. \
 '''
 
         say(msg)
@@ -339,7 +339,7 @@ def handle_policy_command(ack, say, command) -> bool:
             return False
 
         msg = '''\
-AWS 콘솔 접근 권한을 드렸습니다. 🚀
+AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
 지금부터 15분간 AWS콘솔에 접근할 수 있습니다. \
 '''
 
