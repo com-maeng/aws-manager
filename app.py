@@ -378,7 +378,7 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
 
         return False
 
-    if len(iam_user_name[0]) == 0:
+    if len(iam_user_name) == 0:
         say('IAM USER 계정이 부여되지 않은 교육생입니다. 관리자에게 문의해주세요!')
         logging.info('IAM 계정이 없는 교육생의 `/policy` 요청 | 슬랙 ID: %s', slack_id)
 
