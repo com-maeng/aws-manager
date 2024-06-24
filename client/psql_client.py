@@ -145,10 +145,14 @@ class PSQLClient:
             INSERT INTO
                 ownership_info (
 <<<<<<< HEAD
+<<<<<<< HEAD
                     owned_by
 =======
                     owner
 >>>>>>> d095ebb (/policy 커맨드 처리 로직 추가 구현 (#74))
+=======
+                    owned_by
+>>>>>>> 545108d (main branch pull 충돌 해결)
                     , instance_id
                 )
             VALUES
@@ -503,5 +507,21 @@ class PSQLClient:
         '''
 
         fetched_data = self._execute_query(query, (student_id,))
+
+        return fetched_data
+
+    def get_iam_user(self) -> Optional[list[tuple]]:
+        '''iam_user table에 있는 데이터를 추출합니다.'''
+
+        query = '''
+            SELECT 
+                user_name
+                , user_id
+            FROM
+                iam_user
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
 
         return fetched_data
