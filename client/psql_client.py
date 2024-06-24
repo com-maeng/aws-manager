@@ -80,13 +80,13 @@ class PSQLClient:
         if fetched_data:
             return fetched_data[0]
 
-    def insert_instance_request_log(
+    def insert_slack_user_request_log(
         self,
-        student_id: str,
+        student_id: int,
         request_type: str,
         request_time: str
     ) -> None:
-        '''인스턴스 시작/중지 요청 로그를 저장합니다.'''
+        '''슬랙 커맨드가 정상적으로 처리되었을 때, 해당 로그를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO

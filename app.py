@@ -38,34 +38,77 @@ slack_req_handler = SlackRequestHandler(slack_app)
 
 @slack_app.command('/show')
 def handle_show_command(ack, say, command) -> bool:
-    '''사용자 소유의 인스턴스 상태 조회 커맨드(/show)를 처리합니다.'''
+    '''인스턴스 상태 조회 커맨드(/show)를 처리합니다.'''
 
     ack()  # 3초 이내 응답 필요
 
     slack_id = command['user_id']
-    owned_instance_id_list = psql_client.get_user_owned_instance(slack_id)
-    instance_state_list = []
-    instance_state_pairs = []
 
-    if not owned_instance_id_list:
-        say('현재 소유 중인 인스턴스가 없습니다.')
-        logging.info('소유 중인 인스턴스가 없는 사용자의 `/show` 요청 | slack_id: %s', slack_id)
+    # 교육생 여부 및 트랙 체크
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+
+        assert track == 'DE'
+    except ValueError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/show` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+    except AssertionError as e:
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
+        logging.info(
+            'DE 트랙 외 교육생의 `/show` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
 
         return False
 
-    for owned_instance_id in owned_instance_id_list:
-        instance_state = ec2_client.get_instance_state(owned_instance_id)
+    # 소유 중인 인스턴스 조회
+    instance_id_list = psql_client.get_user_owned_instance(student_id)
 
-        instance_state_list.append(instance_state)
+    if not instance_id_list:
+        say('현재 소유 중인 인스턴스가 없습니다.')
+        logging.info(
+            '소유 중인 인스턴스가 없는 사용자의 `/show` 요청 | 슬랙 ID: %s',
+            slack_id
+        )
 
-    for tup in zip(owned_instance_id_list, instance_state_list):
-        # - i-1234567890abcdef0 : running, - i-abcdef1234567890 : stopped, ...
-        instance_state_pairs.append(f'- {tup[0]} : {tup[1]}')
+        return False
 
-    msg = '\n'.join(instance_state_pairs)
+    # 인스턴스 상태 조회
+    instance_state_dict = ec2_client.get_instance_state(instance_id_list)
+
+    if not instance_state_dict:
+        say('알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.')
+        logging.error('인스턴스 상태 조회 실패 | 인스턴스 ID: %s', instance_id_list)
+
+        return False
+
+    # 상태 정보 메시지 전송
+    instance_state_str_list = '\n'.join(
+        [f'- {k}: {v}' for k, v in instance_state_dict.items()]
+    )
+    msg = f'''\
+🔍 인스턴스 상태 조회 결과
+
+{instance_state_str_list}\
+    '''
 
     say(msg)
-    logging.info('인스턴스 상태 조회 요청 | slack_id: %s', slack_id)
+
+    # 로그 데이터 적재
+    now = datetime.now(timezone('Asia/Seoul'))
+
+    psql_client.insert_slack_user_request_log(
+        student_id,
+        'show',
+        str(now.strftime('%Y-%m-%d %H:%M:%S'))
+    )
 
     return True
 
@@ -147,9 +190,7 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     say(msg)
-
-    # 로그 데이터 적재
-    psql_client.insert_instance_request_log(
+    psql_client.insert_slack_user_request_log(
         student_id,
         'stop',
         str(now.strftime('%Y-%m-%d %H:%M:%S'))
@@ -259,8 +300,7 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
 
     say(msg)
 
-    # 로그 데이터 적재
-    psql_client.insert_instance_request_log(
+    psql_client.insert_slack_user_request_log(
         student_id,
         'start',
         str(now.strftime('%Y-%m-%d %H:%M:%S'))
