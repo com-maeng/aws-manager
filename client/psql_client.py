@@ -24,8 +24,6 @@ class PSQLClient:
         params: tuple = None,
         many: bool = False
     ) -> Optional[list[tuple[str]]]:
-        fetched_data = []
-
         try:
             with psycopg.connect(  # pylint: disable=not-context-manager
                 host=self.host,
@@ -41,13 +39,9 @@ class PSQLClient:
                         cur.execute(query, params)
 
                     if query.split()[0] == 'SELECT':
-                        fetched_data = cur.fetchall()
+                        return cur.fetchall()
         except psycopg.Error as e:
-            logging.error('쿼리 실행 실패 | %s', e)
-
-            raise e
-
-        return fetched_data
+            logging.error('쿼리 실행 실패 | query: %s | error: %s', query, e)
 
     def insert_into_student(
         self,
@@ -376,7 +370,7 @@ class PSQLClient:
     def get_iam_user_name(
         self,
         student_id: int
-    ) -> Optional[str]:
+    ) -> Optional[list[tuple[str]]]:
         '''iam_user table 에서 user_name을 반환합니다.'''
 
         query = '''

@@ -14,7 +14,6 @@ from flask import Flask, request
 
 from pytz import timezone
 
-
 from client.slack_client import SlackClient
 from client.aws_client import EC2Client, IAMClient
 from client.psql_client import PSQLClient
@@ -341,7 +340,7 @@ def handle_policy_command(ack, say, command) -> bool:
 
         msg = '''\
 AWS 콘솔 접근 권한을 드렸습니다. 🚀
-지금부터 15분간 AWS콘솔에 접근할 수 있습니다. 
+지금부터 15분간 AWS콘솔에 접근할 수 있습니다. \
 '''
 
         say(msg)
@@ -364,7 +363,7 @@ AWS 콘솔 접근 권한을 드렸습니다. 🚀
 
         msg = f'''\
 15분이 경과하여 콘솔 접근 권한이 회수되었습니다. :smiling_face_with_tear:
-⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count[0][0]}번 남았습니다.
+⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count[0][0]}번 남았습니다.\
 '''
 
         say(msg)
@@ -373,7 +372,7 @@ AWS 콘솔 접근 권한을 드렸습니다. 🚀
 
     iam_user_name = psql_client.get_iam_user_name(student_id)
 
-    if not iam_user_name:
+    if iam_user_name is None:
         say('IAM User 정보를 불러오는 중 문제가 발생했습니다. 관리자에게 문의해주세요!')
         logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
 
