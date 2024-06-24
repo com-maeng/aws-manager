@@ -81,15 +81,13 @@ class PSQLClient:
         if fetched_data:
             return fetched_data[0]
 
-        return None
-
-    def insert_instance_request_log(
+    def insert_slack_user_request_log(
         self,
         student_id: int,
         request_type: str,
         request_time: str
     ) -> None:
-        '''인스턴스 시작/중지 요청 로그를 저장합니다.'''
+        '''슬랙 커맨드가 정상적으로 처리되었을 때, 해당 로그를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO
@@ -117,15 +115,15 @@ class PSQLClient:
         '''
 
         query = '''
-            SELECT 
+            SELECT
                 instance_id
-            FROM 
+            FROM
                 slack_user_request_log
-            WHERE 
+            WHERE
                 request_type = 'start'
                 AND request_user = %s
             ORDER BY
-                request_time DESC 
+                request_time DESC
             LIMIT
                 1
             ;
@@ -272,13 +270,13 @@ class PSQLClient:
         '''특정 학생이 소유하고 있는 인스턴스의 리스트를 반환합니다.'''
 
         query = '''
-            SELECT 
+            SELECT
                 instance_id
-            FROM 
+            FROM
                 ownership_info
-            WHERE 
+            WHERE
                 owner = (
-                    SELECT 
+                    SELECT
                         iam_username,
                     FROM
                         student
@@ -319,6 +317,38 @@ class PSQLClient:
             return fetched_data[0][0]
 
         return None
+
+    def get_name_and_student_id(self) -> list[tuple[str, int]]:
+        '''student 테이블에 적재된 모든 학생들의 한글 본명과 ID를 반환합니다.'''
+
+        query = '''
+            SELECT
+                name  -- 한글 본명
+                , student_id
+            FROM
+                student
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
+
+    def insert_into_iam_user(
+        self,
+        iam_user_data: list[tuple[str, int]]
+    ) -> None:
+        '''iam_user 테이블에 데이터를 적재합니다.'''
+
+        query = '''
+            INSERT INTO
+                iam_user (user_name, owned_by)
+            VALUES
+                (%s, %s)
+            ;
+        '''
+
+        self._execute_query(query, (iam_user_data, ), many=True)
 
     def insert_into_cloudtrail_log(
         self,
