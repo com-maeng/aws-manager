@@ -95,14 +95,14 @@ class EC2Client:
 
             return False
 
-    def get_live_instance_id_list(self, state: list[str]) -> list[str]:
+    def get_live_instance_id_list(self, states: list[str]) -> list[str]:
         '''시작/중지 상태인 모든 EC2 인스턴스의 ID가 담긴 리스트를 반환합니다.'''
 
         instance_id_list = []
         response = self.client.describe_instances(Filters=[
             {
                 'Name': 'instance-state-name',
-                'Values': state,
+                'Values': states,
             },
         ])
         reservations = response['Reservations']

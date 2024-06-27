@@ -1,6 +1,5 @@
 '''5분마다 AWS CloudTrail API를 호출하여 StopInstances, StartInstances, RunInstances 로그 정보를 수집하고 DB에 적재합니다.
 
-이 스크립트는 cron 작업으로 5분마다 실행됩니다.
 데이터 누락 방지를 위해 로그 수집 시간 간격을 10분으로 설정하였습니다. 
 '''
 
@@ -13,15 +12,23 @@ from datetime import datetime, timedelta
 import pytz
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[
+        logging.FileHandler('console_access_manager.log', mode='a'),
+    ],
+)
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
 
 sys.path.append(app_dir)
 
 
-def parse_ec2_logs(
+def parsing_ec2_logs(
     logs: list[dict]
-) -> list[tuple[str, str, str]]:
+) -> list[tuple[str, str, datetime]]:
     '''Log에서 EventName, EventTime, Instance ID 정보만 추출합니다.'''
 
     logs_list = []
@@ -76,7 +83,7 @@ if __name__ == '__main__':
 
     total_logs = stop_logs + start_logs + run_logs
 
-    logs_to_insert = parse_ec2_logs(total_logs)
+    logs_to_insert = parsing_ec2_logs(total_logs)
 
     if len(logs_to_insert) != 0:
         psql_client.insert_into_cloudtrail_log(logs_to_insert)

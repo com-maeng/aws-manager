@@ -46,3 +46,11 @@ class SlackClient:
             )
 
         return users_info
+
+    def send_app_alarm(self, slack_id: str, msg: str) -> None:
+        '''앱 알람 형식으로 해당 슬랙 유저에게 메세지를 전송합니다.'''
+
+        self.app.client.chat_postMessage(
+            channel=slack_id,
+            text=msg
+        )

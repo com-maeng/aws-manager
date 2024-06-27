@@ -8,6 +8,15 @@ import os
 import logging
 import sys
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[
+        logging.FileHandler('console_access_manager.log', mode='a'),
+    ],
+)
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
 
@@ -58,13 +67,13 @@ if __name__ == "__main__":
             'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다. | %s ',
             run_logs
         )
-        exit(1)
+        sys.exit(1)
 
     if len(run_logs) == 0:
         logging.info(
             'AWS CloudTrail의 새로운 RunInstances Events가 없으므로 정상 종료됩니다.'
         )
-        exit(0)
+        sys.exit(0)
 
     instance_owned_info = ec2_run_log_parser(run_logs)
     iam_user_info_from_db = dict(

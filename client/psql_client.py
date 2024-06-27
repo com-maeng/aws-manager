@@ -144,15 +144,7 @@ class PSQLClient:
         query = '''
             INSERT INTO
                 ownership_info (
-<<<<<<< HEAD
-<<<<<<< HEAD
                     owned_by
-=======
-                    owner
->>>>>>> d095ebb (/policy 커맨드 처리 로직 추가 구현 (#74))
-=======
-                    owned_by
->>>>>>> 545108d (main branch pull 충돌 해결)
                     , instance_id
                 )
             VALUES
@@ -404,36 +396,24 @@ class PSQLClient:
 
         return fetched_data
 
-    def get_slack_id_and_instance_id_with_no_remaining_time(self) -> Optional[list[tuple[str, str]]]:
+    def get_slack_id_and_instance_id_with_no_remaining_time(
+        self
+    ) -> Optional[list[tuple[str, str]]]:
         '''ec2 사용시간을 모두 사용한 학생의 슬랙 아이디, 소유한 인스턴스들을 추출합니다.'''
 
         query = '''
             SELECT 
-                s.slack_id, owner.INSTANCE_ID 
-            FROM
+                s.slack_id, oi.instance_id
+            FROM 
                 student AS s
-            JOIN
-                (
-                SELECT
-                    *
-                FROM
-                    iam_user
-                WHERE
-                    user_id = (
-                        SELECT
-                            iam_user_id
-                        FROM
-                            ec2_usage_quota
-                        WHERE
-                            remaining_time = '00:00:00'
-                    )
-                ) AS zero_time_user
-            ON
-                s.student_id = zero_time_user.owned_by
             JOIN 
-                ownership_info AS owner
-            ON 
-                zero_time_user.user_id = owner.owned_by
+                iam_user AS iu ON s.student_id = iu.owned_by
+            JOIN 
+                ownership_info AS oi ON iu.user_id = oi.owned_by
+            JOIN 
+                ec2_usage_quota AS euq ON iu.user_id = euq.iam_user_id
+            WHERE 
+                euq.remaining_time = '00:00:00'
             ;
         '''
 
@@ -463,7 +443,8 @@ class PSQLClient:
 
     def get_policy_request_count(
         self,
-        student_id: int
+        student_id: int,
+        date: datetime
     ) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
@@ -475,10 +456,10 @@ class PSQLClient:
             WHERE 
                 request_type = 'policy'
                 AND request_user = %s
-                AND request_time::DATE = CURRENT_DATE
+                AND request_time::DATE = %s
             ;
         '''
 
-        fetched_data = self._execute_query(query, (student_id,))
+        fetched_data = self._execute_query(query, (student_id, date))
 
         return fetched_data
