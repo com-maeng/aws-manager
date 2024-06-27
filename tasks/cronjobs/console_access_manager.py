@@ -43,8 +43,6 @@ def is_regular_education_day(today_dt: datetime) -> bool:
 def main() -> None:
     '''메인 로직이 실행되는 함수입니다.'''
 
-    STUDENT_GROUP_NAME = 'student'  # pylint: disable=invalid-name
-
     today_dt = datetime.now(timezone('Asia/Seoul'))
 
     if not is_regular_education_day(today_dt):
@@ -55,13 +53,13 @@ def main() -> None:
 
     if today_dt.hour == 8:
         iam_client.attach_policy_to_group(
-            group_name=STUDENT_GROUP_NAME,
+            group_name=iam_client.STUDENT_GROUP_NAME,
             policy_arn=iam_client.STUDENT_POLICY_ARN,
         )
         logging.info('교육생 콘솔 접근 권한(정책) 부여 완료 | %s', today_dt)
     elif today_dt.hour == 18:
         iam_client.detach_policy_from_group(
-            group_name=STUDENT_GROUP_NAME,
+            group_name=iam_client.STUDENT_GROUP_NAME,
             policy_arn=iam_client.STUDENT_POLICY_ARN,
         )
         logging.info('교육생 콘솔 접근 권한(정책) 제거 완료 | %s', today_dt)

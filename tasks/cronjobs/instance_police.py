@@ -53,9 +53,9 @@ if __name__ == "__main__":
         logging.info('중지 할 인스턴스가 없어서 실행을 종료합니다.')
         sys.exit(0)
 
-    if len(stopped_instance_list) == 0:
-        logging.info('중지 할 인스턴스가 없어서 실행을 종료합니다.')
-        sys.exit(0)
+    if not ec2_client.stop_instance(stopped_instance_list):
+        logging.error('인스턴스 중지 시, 알 수 없는 문제가 발생하여 실행을 종료합니다.')
+        sys.exit(1)
 
     for slack_id in slack_id_to_alarm:
         slack_client.app.client.chat_postMessage(

@@ -43,8 +43,9 @@ def ec2_run_log_parser(
 
 
 if __name__ == "__main__":
-    import pytz
     from datetime import datetime, timedelta
+
+    import pytz
 
     from client.aws_client import CloudTrailClient
     from client.psql_client import PSQLClient
