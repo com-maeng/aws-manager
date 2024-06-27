@@ -5,12 +5,41 @@
 
 
 import os
+import logging
 import sys
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
+    handlers=[
+        logging.FileHandler('console_access_manager.log', mode='a'),
+    ],
+)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 app_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
 
 sys.path.append(app_dir)
+
+
+def ec2_run_log_parser(
+    runinstance_events: list[dict]
+) -> list[tuple[str, str]]:
+    '''Log들 중 instance id와 instance의 소유권 정보를 추출'''
+
+    owner_info_list = []
+
+    for event in runinstance_events:
+        user_name = event['Username']
+        for resource in event['Resources']:
+            if resource['ResourceType'] == 'AWS::EC2::Instance':
+                ec2_instance_id = resource['ResourceName']
+                break
+
+        owner_info_list.append((user_name, ec2_instance_id))
+
+    return owner_info_list
 
 
 if __name__ == "__main__":
@@ -25,16 +54,42 @@ if __name__ == "__main__":
 
     end_time = datetime.now(pytz.utc)
     start_time = end_time - timedelta(hours=1)
+    owner_logs_to_insert = []
 
-    runinstance_event_list = cloudtrail_client.get_event_log_by_event_name(
-        'RunInstances', start_time, end_time)
-    owner_info = cloudtrail_client.get_instance_owner_info(
-        runinstance_event_list)
+    run_logs = cloudtrail_client.get_event_log_by_event_name(
+        'RunInstances',
+        start_time,
+        end_time
+    )
 
-    new_instance_id = [info[1] for info in owner_info]
-    exist_instance_id = psql_client.check_existed_instance_id(
-        new_instance_id)
-    final_onwer_info = list(set(owner_info) - set(exist_instance_id))
+    if run_logs is None:
+        logging.error(
+            'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다. | %s ',
+            run_logs
+        )
+        sys.exit(1)
 
-    if final_onwer_info:
-        psql_client.insert_into_ownership(final_onwer_info)
+    if len(run_logs) == 0:
+        logging.info(
+            'AWS CloudTrail의 새로운 RunInstances Events가 없으므로 정상 종료됩니다.'
+        )
+        sys.exit(0)
+
+    instance_owned_info = ec2_run_log_parser(run_logs)
+    iam_user_info_from_db = dict(
+        psql_client.get_iam_user()
+    )  # {user_name : user_id}
+
+    for info in instance_owned_info:
+        iam_name, instance_id = info
+        owned_by = iam_user_info_from_db.get(iam_name)
+
+        if owned_by:
+            owner_logs_to_insert.append((owned_by, instance_id))
+
+    if len(owner_logs_to_insert) != 0:
+        psql_client.insert_into_ownership_info(owner_logs_to_insert)
+        logging.info(
+            '인스턴스 소유 데이터 적재 성공 | %s',
+            owner_logs_to_insert
+        )
