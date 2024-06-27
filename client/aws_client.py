@@ -178,6 +178,7 @@ class IAMClient:
             region_name='ap-northeast-2',
         )
         self.STUDENT_POLICY_ARN = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'  # pylint: disable=invalid-name
+        self.STUDENT_GROUP_NAME = 'student'  # pylint: disable=invalid-name
 
     def detach_policy_from_group(
             self,
