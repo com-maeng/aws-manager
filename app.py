@@ -435,6 +435,39 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
     return True
 
 
+@slack_app.command('/terminate')
+def handle_terminate_command(ack, say, command) -> bool:
+    '''인스턴스 삭제 커멘드(/terminate)를 처리합니다.'''
+
+    ack()
+
+    slack_id = command['user_id']
+
+    # 교육생 여부 및 트랙 체크
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+
+        assert track == 'DE'
+    except TypeError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/stop` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+    except AssertionError as e:
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info(
+            'DE 트랙 외 교육생의 `/stop` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+
+
 @app.route('/slack/events', methods=['POST'])
 def handle_slack_events():
     '''슬랙에서 송신된 이벤트 관련 request를 처리합니다.'''
