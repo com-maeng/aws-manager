@@ -52,7 +52,7 @@ def handle_show_command(ack, say, command) -> bool:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
 
         assert track == 'DE'
-    except ValueError as e:
+    except TypeError as e:
         say('이어드림스쿨 4기 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
         logging.info(
             '교육생이 아닌 슬랙 유저의 `/show` 요청 | 슬랙 ID: %s | %s',
@@ -345,7 +345,8 @@ def handle_policy_command(ack, say, command) -> bool:
 
         return False
 
-    policy_reqeust_count = psql_client.get_policy_request_count(student_id)
+    policy_reqeust_count = psql_client.get_policy_request_count(
+        student_id, now.date())
 
     if not policy_reqeust_count:
         say('데이터를 불러오는 중에 문제가 발생했습니다. 관리자에게 문의해주세요!')
@@ -393,8 +394,8 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
 
         return True
 
-    def revoke_aws_console_access(iam_user_name: str) -> bool:
-        if not iam_client.detach_user_policy(iam_user_name, iam_client.STUDENT_POLICY_ARN):
+    def revoke_aws_console_access() -> bool:
+        if not iam_client.detach_user_policy(iam_user_name[0][0], iam_client.STUDENT_POLICY_ARN):
             say('AWS 콘솔 접근 권한 회수 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
             logging.info(
                 '`/policy` 요청에서의 AWS IAM client 호출 오류 | 슬랙 ID: %s', slack_id)
@@ -427,7 +428,7 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
     grant_aws_console_access(iam_user_name[0][0])
     policy_timer = threading.Timer(
         900,
-        revoke_aws_console_access(iam_user_name[0][0])
+        revoke_aws_console_access
     )
     policy_timer.start()
 

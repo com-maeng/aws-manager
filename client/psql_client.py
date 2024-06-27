@@ -419,7 +419,8 @@ class PSQLClient:
 
     def get_policy_request_count(
         self,
-        student_id: int
+        student_id: int,
+        date: datetime
     ) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
@@ -431,10 +432,10 @@ class PSQLClient:
             WHERE 
                 request_type = 'policy'
                 AND request_user = %s
-                AND request_time::DATE = CURRENT_DATE
+                AND request_time::DATE = %s
             ;
         '''
 
-        fetched_data = self._execute_query(query, (student_id,))
+        fetched_data = self._execute_query(query, (student_id, date))
 
         return fetched_data
