@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
     handlers=[
-        logging.FileHandler('console_access_manager.log', mode='a'),
+        logging.FileHandler('instance_owner_info_pipeline.log', mode='a'),
     ],
 )
 

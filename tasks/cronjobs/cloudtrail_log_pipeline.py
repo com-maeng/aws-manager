@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
     handlers=[
-        logging.FileHandler('console_access_manager.log', mode='a'),
+        logging.FileHandler('cloudtrail_log_pipeline.log', mode='a'),
     ],
 )
 
