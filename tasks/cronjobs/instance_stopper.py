@@ -33,5 +33,7 @@ if __name__ == '__main__':
 
         sys.exit(1)
 
-    logging.info('인스턴스 중지 작업 완료 | %s',
-                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    logging.info(
+        '인스턴스 중지 작업 완료 | %s | %s',
+        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        running_instances)
