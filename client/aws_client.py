@@ -177,7 +177,8 @@ class IAMClient:
                 'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
             region_name='ap-northeast-2',
         )
-        self.STUDENT_POLICY_ARN = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'  # pylint: disable=invalid-name
+        self.STUDENT_POLICY_ARN = os.getenv(  # pylint: disable=invalid-name
+            'AWS_MANAGER_AWS_STUDENT_POLICY_ARN')
         self.STUDENT_GROUP_NAME = 'student'  # pylint: disable=invalid-name
 
     def detach_policy_from_group(
