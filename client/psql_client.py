@@ -345,7 +345,7 @@ class PSQLClient:
 
         return remaining_tm
 
-    def reset_usage_quota(self, maximum_quota: datetime.time) -> None:
+    def reset_usage_quota(self, maximum_quota: time) -> None:
         '''인스턴스 사용 할당량을 최대 할당량으로 초기화합니다.'''
 
         query = '''
@@ -360,9 +360,9 @@ class PSQLClient:
 
     def get_cloudtrail_log(
         self,
-        range_start_time: datetime.datetime,
-        range_end_time: datetime.datetime
-    ) -> Optional[list[tuple[int, str, datetime.datetime]]]:
+        range_start_time: datetime,
+        range_end_time: datetime
+    ) -> Optional[list[tuple[int, str, datetime]]]:
         '''특정 시간 범위에 생성된 CloudTrail 로그들을 DB에서 조회하여 추출합니다.'''
 
         range_start_time = range_start_time.replace(tzinfo=None)  # UTC
@@ -397,7 +397,7 @@ class PSQLClient:
 
     def update_ec2_usage_quota(
         self,
-        user_data_model: dict[int, dict[str, list[tuple[str, datetime.datetime]] | datetime.time]],
+        user_data_model: dict[int, dict[str, list[tuple[str, datetime]] | time]],
     ) -> None:
         '''사용자별 인스턴스 사용량을 업데이트합니다.'''
 

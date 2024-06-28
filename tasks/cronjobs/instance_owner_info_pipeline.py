@@ -35,9 +35,7 @@ def ec2_run_log_parser(
         for resource in event['Resources']:
             if resource['ResourceType'] == 'AWS::EC2::Instance':
                 ec2_instance_id = resource['ResourceName']
-                break
-
-        owner_info_list.append((user_name, ec2_instance_id))
+                owner_info_list.append((user_name, ec2_instance_id))
 
     return owner_info_list
 
@@ -54,7 +52,7 @@ if __name__ == "__main__":
     psql_client = PSQLClient()
 
     end_time = datetime.now(pytz.utc)
-    start_time = end_time - timedelta(hours=1)
+    start_time = end_time - timedelta(days=10)
     owner_logs_to_insert = []
 
     run_logs = cloudtrail_client.get_event_log_by_event_name(
@@ -88,9 +86,10 @@ if __name__ == "__main__":
         if owned_by:
             owner_logs_to_insert.append((owned_by, instance_id))
 
-    if len(owner_logs_to_insert) != 0:
-        psql_client.insert_into_ownership_info(owner_logs_to_insert)
-        logging.info(
-            '인스턴스 소유 데이터 적재 성공 | %s',
-            owner_logs_to_insert
-        )
+    print(owner_logs_to_insert)
+    # if len(owner_logs_to_insert) != 0:
+    #     psql_client.insert_into_ownership_info(owner_logs_to_insert)
+    #     logging.info(
+    #         '인스턴스 소유 데이터 적재 성공 | %s',
+    #         owner_logs_to_insert
+    #     )
