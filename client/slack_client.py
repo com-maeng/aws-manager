@@ -2,8 +2,10 @@
 
 
 import os
+import logging
 
 from slack_bolt import App
+from slack_sdk.errors import SlackApiError
 
 
 class SlackClient:
@@ -16,6 +18,17 @@ class SlackClient:
         )
         self.de_group_id = os.getenv('AWS_MANAGER_SLACK_DE_GROUP_ID')
         self.ds_group_id = os.getenv('AWS_MANAGER_SLACK_DS_GROUP_ID')
+
+    def send_dm(self, slack_id: str, msg: str) -> None:
+        '''특정 슬랙 사용자에게 DM을 보냅니다.'''
+
+        try:
+            self.app.client.chat_postMessage(
+                channel=slack_id,
+                text=msg
+            )
+        except SlackApiError as e:
+            logging.error('슬랙 사용자 DM API 호출 실패 | %s', e)
 
     def get_users_info_from_group(self, track: str) -> list[dict[str, str]]:
         '''특정 트랙에 속하는 사용자들의 정보를 반환합니다.'''
