@@ -209,6 +209,15 @@ class PSQLClient:
             for d in fetched_data:
                 instance_id_list.append(d[0])  # `instance_id`
 
+            from .aws_client import EC2Client
+
+            ec2_client = EC2Client()
+            instance_live_list = ec2_client.get_live_instance_id_list(
+                ['running', 'stopped'])
+
+            instance_id_list = [
+                i for i in instance_id_list if i in instance_live_list]
+
             return instance_id_list
 
     def get_student_owned_instances(
