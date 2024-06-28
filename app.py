@@ -105,7 +105,7 @@ def handle_show_command(ack, command) -> bool:
         [f'- {k} : {v}' for k, v in instance_state_dict.items()]
     )
     msg = '조회된 인스턴스의 목록 📝\n\n'
-    msg += '\n'.join(instance_state_str_list)
+    msg += ''.join(instance_state_str_list)
 
     slack_client.send_dm(slack_id, msg)
     logging.info('인스턴스 상태 조회 요청 | slack_id: %s', slack_id)
