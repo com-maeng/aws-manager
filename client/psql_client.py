@@ -324,7 +324,7 @@ class PSQLClient:
 
         return remaining_tm
 
-    def reset_usage_quota(self, maximum_quota: int) -> None:
+    def reset_usage_quota(self, maximum_quota: datetime.time) -> None:
         '''인스턴스 사용 할당량을 최대 할당량으로 초기화합니다.'''
 
         query = '''
@@ -336,3 +336,89 @@ class PSQLClient:
         '''
 
         self._execute_query(query, (maximum_quota,))
+
+    def get_cloudtrail_log(
+        self,
+        range_start_time: datetime.datetime,
+        range_end_time: datetime.datetime
+    ) -> Optional[list[tuple[int, str, datetime.datetime]]]:
+        '''특정 시간 범위에 생성된 CloudTrail 로그들을 DB에서 조회하여 추출합니다.'''
+
+        range_start_time = range_start_time.replace(tzinfo=None)  # UTC
+        range_end_time = range_end_time.replace(tzinfo=None)
+        query = '''
+            SELECT
+                owned_by AS iam_user_id
+                , log_type
+                , log_time
+            FROM
+            (
+                SELECT
+                    instance_id  -- JOIN용
+                    , log_type
+                    , log_time
+                FROM
+                    cloudtrail_log
+                WHERE
+                    (log_time BETWEEN %s AND %s)
+                    AND (log_type IN ('StartInstances', 'StopInstances'))
+            ) AS ct_log
+            LEFT JOIN
+                ownership_info
+            USING (instance_id)
+            ORDER BY
+                iam_user_id ASC
+                , log_time ASC
+            ;
+        '''
+
+        return self._execute_query(query, (range_start_time, range_end_time))
+
+    def update_ec2_usage_quota(
+        self,
+        user_data_model: dict[int, dict[str, list[tuple[str, datetime.datetime]] | datetime.time]],
+    ) -> None:
+        '''사용자별 인스턴스 사용량을 업데이트합니다.'''
+
+        create_query = '''
+            CREATE TABLE
+                temp_ec2_usage_quota (
+                    iam_user_id     SMALLINT
+                    , usage_quota   TIME
+                )
+            ;
+        '''
+        insert_query = '''
+            INSERT INTO
+                temp_ec2_usage_quota
+            VALUES
+                (%s, %s)
+            ;
+        '''
+        data_to_insert = [(k, v['usage_quota'])
+                          for k, v in user_data_model.items()]
+        update_query = '''
+            UPDATE
+                ec2_usage_quota
+            SET
+                remaining_time = (
+                    SELECT
+                        usage_quota
+                    FROM
+                        temp_ec2_usage_quota
+                    WHERE
+                        temp_ec2_usage_quota.iam_user_id = ec2_usage_quota.iam_user_id
+                )
+            ;
+        '''
+        drop_query = '''
+            DROP TABLE
+                temp_ec2_usage_quota
+            ;
+        '''
+
+        self._execute_query(create_query)
+        self._execute_query(
+            insert_query, (data_to_insert,), many=True)
+        self._execute_query(update_query)
+        self._execute_query(drop_query)
