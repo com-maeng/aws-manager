@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Update codebase
-cd aws-manager
 git pull origin
 
 # Remove old gunicorn processes
