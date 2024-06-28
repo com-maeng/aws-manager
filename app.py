@@ -5,6 +5,7 @@ Example:
 '''
 
 
+import os
 import threading
 import logging
 from datetime import datetime, timedelta, time
@@ -443,7 +444,7 @@ def handle_terminate_command(ack, say, command) -> bool:
 
     slack_id = command['user_id']
     text = command['text'].replace(" ", "")
-    manager_slack_id = ''
+    manager_slack_id = os.getenv('MANAGER_SLACK_ID')
 
     if len(text) == 0:
         say('종료할 인스턴스 아이디를 함께 작성해주세요.')
@@ -514,8 +515,7 @@ Instance ID : {terminate_instance}\
     )
 
     msg = f'''\
-인스턴스 {terminate_instance}를 삭제합니다... 🗑️
-인스턴스 {terminate_instance}가 정상적으로 삭제되었습니다.\
+인스턴스 {terminate_instance}의 삭제 요청을 보냈습니다... 🗑️\
 '''
     slack_client.app.client.chat_postMessage(
         channel=slack_id,
