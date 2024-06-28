@@ -433,3 +433,19 @@ class PSQLClient:
 
         if fetched_data:
             return fetched_data[0]
+
+    def get_iam_user(self) -> Optional[list[tuple]]:
+        '''iam_user table에 있는 데이터를 추출합니다.'''
+
+        query = '''
+            SELECT
+                user_name
+                , user_id
+            FROM
+                iam_user
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
