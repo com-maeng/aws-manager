@@ -52,7 +52,7 @@ if __name__ == "__main__":
     psql_client = PSQLClient()
 
     end_time = datetime.now(pytz.utc)
-    start_time = end_time - timedelta(days=10)
+    start_time = end_time - timedelta(hours=1)
     owner_logs_to_insert = []
 
     run_logs = cloudtrail_client.get_event_log_by_event_name(
@@ -86,10 +86,9 @@ if __name__ == "__main__":
         if owned_by:
             owner_logs_to_insert.append((owned_by, instance_id))
 
-    print(owner_logs_to_insert)
-    # if len(owner_logs_to_insert) != 0:
-    #     psql_client.insert_into_ownership_info(owner_logs_to_insert)
-    #     logging.info(
-    #         '인스턴스 소유 데이터 적재 성공 | %s',
-    #         owner_logs_to_insert
-    #     )
+    if len(owner_logs_to_insert) != 0:
+        psql_client.insert_into_ownership_info(owner_logs_to_insert)
+        logging.info(
+            '인스턴스 소유 데이터 적재 성공 | %s',
+            owner_logs_to_insert
+        )
