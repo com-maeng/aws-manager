@@ -59,17 +59,16 @@ class PSQLClient:
 
         self._execute_query(query, (users_info,), many=True)
 
-    def get_student_info(
+    def get_track_and_student_id(
         self,
         slack_id: str
     ) -> Optional[tuple[str, int]]:
-        '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보, 이름을 반환합니다.'''
+        '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보를 반환합니다.'''
 
         query = '''
             SELECT
                 track
                 , student_id
-                , name
             FROM
                 student
             WHERE
@@ -413,3 +412,24 @@ class PSQLClient:
         fetched_data = self._execute_query(query)
 
         return fetched_data
+
+    def get_student_name(
+        self,
+        slack_id: str
+    ) -> Optional[tuple[str, int]]:
+        '''슬랙 유저의 이름 정보를 반환합니다.'''
+
+        query = '''
+            SELECT
+                name
+            FROM
+                student
+            WHERE
+                slack_id = %s
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (slack_id,))
+
+        if fetched_data:
+            return fetched_data[0]
