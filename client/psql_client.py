@@ -135,20 +135,24 @@ class PSQLClient:
 
         return None
 
-    def insert_into_ownership(
+    def insert_into_ownership_info(
         self,
-        owner_info_list: list[tuple[str, str]]
+        owner_info_list: list[tuple[int, str]]
     ) -> None:
         '''사용자의 instance 소유 정보를 DB에 저장합니다.'''
 
         query = '''
             INSERT INTO
                 ownership_info (
-                    owner
+                    owned_by
                     , instance_id
                 )
             VALUES
                 (%s, %s)
+            ON 
+                CONFLICT (instance_id) 
+            DO 
+                NOTHING
             ;
         '''
 
@@ -206,62 +210,6 @@ class PSQLClient:
                 instance_id_list.append(d[0])  # `instance_id`
 
             return instance_id_list
-
-    def insert_system_logs(
-        self,
-        instance_id: str,
-        log_type: str,
-        log_time: str
-    ) -> None:
-        '''system log를 DB에 저장하는 기능 구현.'''
-
-        query = '''
-            INSERT INTO
-                system_log(
-                    instance_id
-                    , log_type
-                    , log_time)
-            VALUES
-                (%s, %s, %s)
-            ;
-            '''
-        self._execute_query(query, (instance_id, log_type, log_time))
-
-    def get_today_instance_logs(
-        self,
-        instance_id: str
-    ) -> list[tuple[str, str]]:
-        '''지정된 인스턴스 ID에 대해 오늘의 로그를 DB에서 조회하여리스트로 반환합니다.
-
-        로그는 'slack_user_request_log'와 'system_log' 두 테이블에서 조회함.
-        '''
-
-        query = '''
-            SELECT
-                instance_id
-                ,request_type
-                ,request_time
-            FROM
-                slack_user_request_log
-            WHERE
-                instance_id = %s
-                AND request_time::DATE = CURRENT_DATE
-            UNION
-            SELECT
-                instance_id
-                ,log_type
-                ,log_time
-            FROM
-                system_log
-            WHERE
-                instance_id = %s
-                AND log_time::DATE = CURRENT_DATE
-            ORDER BY
-                request_time
-            ;
-        '''
-
-        return self._execute_query(query, (instance_id, instance_id))
 
     def get_student_owned_instances(
         self,
@@ -419,7 +367,8 @@ class PSQLClient:
 
     def get_policy_request_count(
         self,
-        student_id: int
+        student_id: int,
+        date: datetime
     ) -> Optional[int]:
         '''사용자가 오늘 요청한 (`/policy`) 횟수를 반환합니다.'''
 
@@ -431,10 +380,35 @@ class PSQLClient:
             WHERE 
                 request_type = 'policy'
                 AND request_user = %s
-                AND request_time::DATE = CURRENT_DATE
+                AND request_time::DATE = %s
             ;
         '''
 
-        fetched_data = self._execute_query(query, (student_id,))
+        fetched_data = self._execute_query(query, (student_id, date))
+
+        return fetched_data
+
+    def get_slack_id_and_instance_id_with_no_remaining_time(
+        self
+    ) -> Optional[list[tuple[str, str]]]:
+        '''ec2 사용시간을 모두 사용한 학생의 슬랙 아이디, 소유한 인스턴스들을 추출합니다.'''
+
+        query = '''
+            SELECT 
+                s.slack_id, oi.instance_id
+            FROM 
+                student AS s
+            JOIN 
+                iam_user AS iu ON s.student_id = iu.owned_by
+            JOIN 
+                ownership_info AS oi ON iu.user_id = oi.owned_by
+            JOIN 
+                ec2_usage_quota AS euq ON iu.user_id = euq.iam_user_id
+            WHERE 
+                euq.remaining_time = '00:00:00'
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
 
         return fetched_data
