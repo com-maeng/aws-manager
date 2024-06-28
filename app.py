@@ -5,6 +5,7 @@ Example:
 '''
 
 
+import threading
 import logging
 from datetime import datetime, timedelta, time
 
@@ -14,7 +15,7 @@ from flask import Flask, request
 from pytz import timezone
 
 from client.slack_client import SlackClient
-from client.aws_client import EC2Client
+from client.aws_client import EC2Client, IAMClient
 from client.psql_client import PSQLClient
 from client.instance_usage_manager import InstanceUsageManager
 
@@ -27,12 +28,14 @@ logging.basicConfig(
 )
 
 ec2_client = EC2Client()
+iam_client = IAMClient()
 slack_client = SlackClient()
 psql_client = PSQLClient()
 instance_usage_manager = InstanceUsageManager()
 
 app = Flask(__name__)
 slack_app = slack_client.app
+
 slack_req_handler = SlackRequestHandler(slack_app)
 
 
@@ -46,11 +49,36 @@ def handle_show_command(ack, command) -> bool:
     ack()  # 3초 이내 응답 필요
     slack_client.send_dm(slack_id, msg)
 
-    owned_instance_id_list = psql_client.get_user_owned_instance(slack_id)
-    instance_state_list = []
-    instance_state_pairs = []
+    # 교육생 여부 및 트랙 체크
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
 
-    if not owned_instance_id_list:
+        assert track == 'DE'
+    except TypeError as e:
+        msg = '이어드림스쿨 4기 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.'
+
+        slack_client.send_dm(slack_id, msg)
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/show` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+    except AssertionError as e:
+        msg = '현재는 DE 트랙 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.'
+
+        slack_client.send_dm(slack_id, msg)
+        logging.info(
+            'DE 트랙 외 교육생의 `/show` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+    user_owned_instance_list = psql_client.get_user_owned_instance(student_id)
+
+    # 소유 중인 인스턴스 조회
+    if not user_owned_instance_list:
         msg = '현재 소유 중인 인스턴스가 없습니다.'
 
         slack_client.send_dm(slack_id, msg)
@@ -58,20 +86,33 @@ def handle_show_command(ack, command) -> bool:
 
         return False
 
-    for owned_instance_id in owned_instance_id_list:
-        instance_state = ec2_client.get_instance_state(owned_instance_id)
+    # 인스턴스 상태 조회
+    instance_state_dict = ec2_client.get_instance_state(
+        user_owned_instance_list)
 
-        instance_state_list.append(instance_state)
+    if not instance_state_dict:
+        msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
 
-    for tup in zip(owned_instance_id_list, instance_state_list):
-        # - i-1234567890abcdef0 : running, - i-abcdef1234567890 : stopped, ...
-        instance_state_pairs.append(f'- {tup[0]} : {tup[1]}')
+        slack_client.send_dm(slack_id, msg)
+        logging.error('인스턴스 상태 조회 실패 | 인스턴스 ID: %s', user_owned_instance_list)
 
-    msg = '조회된 인스턴스의 목록 📝\n'
-    msg += '\n'.join(instance_state_pairs)
+        return False
+
+    # 상태 정보 메시지 전송, 로그 데이터 적재
+    now = datetime.now(timezone('Asia/Seoul'))
+    instance_state_str_list = '\n'.join(
+        [f'- {k} : {v}' for k, v in instance_state_dict.items()]
+    )
+    msg = '조회된 인스턴스의 목록 📝\n\n'
+    msg += '\n'.join(instance_state_str_list)
 
     slack_client.send_dm(slack_id, msg)
     logging.info('인스턴스 상태 조회 요청 | slack_id: %s', slack_id)
+    psql_client.insert_slack_user_request_log(
+        student_id,
+        'show',
+        str(now.strftime('%Y-%m-%d %H:%M:%S'))
+    )
 
     return True
 
@@ -91,7 +132,7 @@ def handle_stop_command(ack, command) -> bool:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
 
         assert track == 'DE'
-    except ValueError as e:
+    except TypeError as e:
         msg = '이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.'
 
         slack_client.send_dm(slack_id, msg)
@@ -154,9 +195,9 @@ def handle_stop_command(ack, command) -> bool:
 
     logging.info('인스턴스 중지 | 인스턴스 ID: %s', instance_id_list)
 
-    # 성공 메시지 전송
-    remaining_tm = psql_client.get_remaining_usage_time(student_id)
+    # 성공 메시지 전송, 로그 데이터 적재
     now = datetime.now(timezone('Asia/Seoul'))
+    remaining_tm = psql_client.get_remaining_usage_time(student_id)
     msg = f'''\
 모든 인스턴스를 성공적으로 중지했습니다 🛌
 - 오늘의 잔여 할당량: `{remaining_tm.hour}시간 {remaining_tm.minute}분 {remaining_tm.second}초`
@@ -165,9 +206,7 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     slack_client.send_dm(slack_id, msg)
-
-    # 로그 데이터 적재
-    psql_client.insert_instance_request_log(
+    psql_client.insert_slack_user_request_log(
         student_id,
         'stop',
         str(now.strftime('%Y-%m-%d %H:%M:%S'))
@@ -191,7 +230,7 @@ def handle_start_command(ack, command) -> bool:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
 
         assert track == 'DE'
-    except ValueError as e:
+    except TypeError as e:
         msg = '이어드림스쿨 4기 교육생이 아니면 인스턴스를 시작할 수 없습니다.'
 
         slack_client.send_dm(slack_id, msg)
@@ -272,9 +311,7 @@ def handle_start_command(ack, command) -> bool:
 
         return False
 
-    logging.info('인스턴스 시작 | 인스턴스 ID: %s', instance_id_list)
-
-    # 성공 메시지 전송
+    # 성공 메시지 전송, 로그 데이터 적재
     now = datetime.now(timezone('Asia/Seoul'))
     maximum_usage_time = now + timedelta(
         hours=remaining_tm.hour,
@@ -292,13 +329,135 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     slack_client.send_dm(slack_id, msg)
-
-    # 로그 데이터 적재
-    psql_client.insert_instance_request_log(
+    logging.info('인스턴스 시작 | 인스턴스 ID: %s', instance_id_list)
+    psql_client.insert_slack_user_request_log(
         student_id,
         'start',
         str(now.strftime('%Y-%m-%d %H:%M:%S'))
     )
+
+    return True
+
+
+@slack_app.command('/policy')
+def handle_policy_command(ack, say, command) -> bool:
+    '''AWS 임시 콘솔 접근 부여 커맨드(/policy)를 처리합니다.'''
+
+    ack()
+
+    slack_id = command['user_id']
+    now = datetime.now(timezone('Asia/Seoul'))
+
+    # 교육생 여부 체크
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+
+        assert track == 'DE'
+    except TypeError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/policy` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+    except AssertionError as e:
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스의 상태를 조회할 수 없습니다.')
+        logging.info(
+            'DE 트랙 외 교육생의 `/policy` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+
+    policy_reqeust_count = psql_client.get_policy_request_count(
+        student_id, now.date())
+
+    if not policy_reqeust_count:
+        say('데이터를 불러오는 중에 문제가 발생했습니다. 관리자에게 문의해주세요!')
+        logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    if policy_reqeust_count[0][0] >= 4:
+        msg = '''\
+오늘은 더이상 임시 콘솔 접근 권한을 요청할 수 없습니다.:melting_face:
+임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. \
+'''
+
+        say(msg)
+
+        logging.info(
+            '`/policy` 요청 횟수 초과 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+
+    def grant_aws_console_access(iam_user_name: str) -> bool:
+
+        if not iam_client.attach_user_policy(iam_user_name, iam_client.STUDENT_POLICY_ARN):
+            say('AWS 콘솔 접근 권한 부여 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+            logging.info(
+                '`/policy` 요청에서의 AWS IAM client 호출 오류 | 슬랙 ID: %s', slack_id)
+
+            return False
+
+        msg = '''\
+AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
+지금부터 15분간 AWS콘솔에 접근할 수 있습니다. \
+'''
+
+        say(msg)
+
+        psql_client.insert_slack_user_request_log(
+            student_id,
+            'policy',
+            str(now.strftime('%Y-%m-%d %H:%M:%S'))
+        )
+
+        return True
+
+    def revoke_aws_console_access() -> bool:
+        if not iam_client.detach_user_policy(iam_user_name[0][0], iam_client.STUDENT_POLICY_ARN):
+            say('AWS 콘솔 접근 권한 회수 중 문제가 발생하였습니다.:scream: 관리자에게 문의해주세요!')
+            logging.info(
+                '`/policy` 요청에서의 AWS IAM client 호출 오류 | 슬랙 ID: %s', slack_id)
+
+            return False
+
+        msg = f'''\
+15분이 경과하여 콘솔 접근 권한이 회수되었습니다. :smiling_face_with_tear:
+⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count[0][0]}번 남았습니다.\
+'''
+
+        say(msg)
+
+        return True
+
+    iam_user_name = psql_client.get_iam_user_name(student_id)
+
+    if iam_user_name is None:
+        say('IAM User 정보를 불러오는 중 문제가 발생했습니다. 관리자에게 문의해주세요!')
+        logging.info('`/policy` 요청에서의 DB 접근 오류 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    if len(iam_user_name) == 0:
+        say('IAM USER 계정이 부여되지 않은 교육생입니다. 관리자에게 문의해주세요!')
+        logging.info('IAM 계정이 없는 교육생의 `/policy` 요청 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    grant_aws_console_access(iam_user_name[0][0])
+    policy_timer = threading.Timer(
+        900,
+        revoke_aws_console_access
+    )
+    policy_timer.start()
 
     return True
 

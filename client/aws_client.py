@@ -177,6 +177,8 @@ class IAMClient:
                 'AWS_MANAGER_AWS_SECRET_ACCESS_KEY'),
             region_name='ap-northeast-2',
         )
+        self.STUDENT_POLICY_ARN = 'arn:aws:iam::473952381102:policy/GeneralStudentsPolicy'  # pylint: disable=invalid-name
+        self.STUDENT_GROUP_NAME = 'student'  # pylint: disable=invalid-name
 
     def detach_policy_from_group(
             self,
@@ -216,9 +218,53 @@ class IAMClient:
             )
             raise e
 
+    def attach_user_policy(
+        self,
+        user_name: str,
+        policy_arn: str,
+    ) -> bool:
+        '''IAM user에게 특정 정책을 추가합니다.'''
+
+        try:
+            self.client.attach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+
+            return True
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 부여 API(`attach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+
+            return False
+
+    def detach_user_policy(
+        self,
+        user_name: str,
+        policy_arn: str,
+    ) -> bool:
+        '''IAM user에게 특정 정책을 제거합니다.'''
+
+        try:
+            self.client.detach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn,
+            )
+
+            return True
+        except ClientError as e:
+            logging.error(
+                'IAM 유저 정책 제거 API(`detach_user_policy()`) 호출 실패 | %s',
+                e,
+            )
+
+            return False
+
 
 class CloudTrailClient:
-    '''CloudTrail 클라이언트로 인스턴스의 소유자 정보 확인하는 기능을 제공합니다.'''
+    '''AWS CloudTrail API를 활용하는 작업을 모두 구현합니다.'''
 
     def __init__(self):
         self.client = boto3.client(
@@ -229,53 +275,68 @@ class CloudTrailClient:
             region_name='ap-northeast-2',
         )
 
-    def get_runinstance_events(
+    def get_event_log_by_event_name(
         self,
+        event_name: str,
         start_time: datetime,
-        end_time: datetime,
-    ) -> list[dict]:
-        ''' 지정된 시간 범위에 생성된 Runinstances 로그들을 추출합니다.'''
+        end_time: datetime
+    ) -> Optional[list[dict]]:
+        ''' 지정된 시간 범위에 생성된 CloudTrail 로그들 중 해당 event name에 알맞은 log들을 추출합니다.
 
-        runinstance_events = []
-        response = self.client.lookup_events(
-            LookupAttributes=[
-                {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
-            ],
-            StartTime=start_time,
-            EndTime=end_time,
-            MaxResults=50,
-        )
-        runinstance_events.extend(response['Events'])
+        Args:
+            event_name (str): AWS CloudTrail Event history의 Event name 입니다.
+            start_time (datetime): 조회 시작 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+            end_time (datetime): 조회 종료 시간으로 UTC 기준 시간이 들어와야 log를 정확하게 추출합니다. 
+        '''
 
-        while 'NextToken' in response:
+        event_logs = []
+
+        try:
             response = self.client.lookup_events(
                 LookupAttributes=[
-                    {'AttributeKey': 'EventName', 'AttributeValue': 'RunInstances'}
+                    {
+                        'AttributeKey': 'EventName',
+                        'AttributeValue': event_name
+                    }
                 ],
                 StartTime=start_time,
                 EndTime=end_time,
                 MaxResults=50,
-                NextToken=response['NextToken']
             )
-            runinstance_events.extend(response['Events'])
+        except ClientError as e:
+            logging.error(
+                'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                event_name,
+                e,
+            )
 
-        return runinstance_events
+            return None
 
-    def get_instance_owner_info(
-        self,
-        runinstance_events: list[dict]
-    ) -> list[tuple[str, str]]:
-        '''Log들 중 instance id와 instance의 소유권 정보를 추출'''
+        event_logs.extend(response['Events'])
 
-        owner_info_list = []
+        while 'NextToken' in response.keys():
+            try:
+                response = self.client.lookup_events(
+                    LookupAttributes=[
+                        {
+                            'AttributeKey': 'EventName',
+                            'AttributeValue': event_name
+                        }
+                    ],
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    MaxResults=50,
+                    NextToken=response['NextToken']
+                )
+            except ClientError as e:
+                logging.error(
+                    'CloudTrail의 이벤트 이름 %s에 대한 이벤트 조회 실패 | %s',
+                    event_name,
+                    e,
+                )
 
-        for event in runinstance_events:
-            user_name = event['Username']
-            for resource in event['Resources']:
-                if resource['ResourceType'] == 'AWS::EC2::Instance':
-                    instance_id = resource['ResourceName']
-                    break
+                return None
 
-            owner_info_list.append((user_name, instance_id))
+            event_logs.extend(response['Events'])
 
-        return owner_info_list
+        return event_logs
