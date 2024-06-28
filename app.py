@@ -5,6 +5,7 @@ Example:
 '''
 
 
+import os
 import threading
 import logging
 from datetime import datetime, timedelta, time
@@ -460,6 +461,93 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
     policy_timer.start()
 
     return True
+
+
+@slack_app.command('/terminate')
+def handle_terminate_command(ack, say, command) -> bool:
+    '''인스턴스 삭제 커멘드(/terminate)를 처리합니다.'''
+
+    ack()
+
+    slack_id = command['user_id']
+    text = command['text'].replace(" ", "")
+    manager_slack_id = os.getenv('MANAGER_SLACK_ID')
+
+    if len(text) == 0:
+        say('종료할 인스턴스 아이디를 함께 작성해주세요.')
+
+        return False
+
+    request_instance_id = text.split(",")
+    terminate_instance = []
+
+    # 교육생 여부 및 트랙 체크
+    try:
+        track, student_id = psql_client.get_track_and_student_id(slack_id)
+        name = psql_client.get_student_name(slack_id)
+
+        assert track == 'DE'
+    except TypeError as e:
+        say('이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info(
+            '교육생이 아닌 슬랙 유저의 `/terminate` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+    except AssertionError as e:
+        say('현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.')
+        logging.info(
+            'DE 트랙 외 교육생의 `/terminate` 요청 | 슬랙 ID: %s | %s',
+            slack_id,
+            e
+        )
+
+        return False
+
+    # 자기 소유 인스턴스 확인
+    owned_instances = psql_client.get_user_owned_instance(student_id)
+
+    if owned_instances is None:
+        say('데이터를 불러오는 중에 문제가 발생했습니다. 관리자에게 문의해주세요!')
+        logging.info(
+            '`/terminate` 요청에서의 DB 연결 오류 | 슬랙 ID: %s', slack_id)
+
+        return False
+
+    for instance in request_instance_id:
+        if instance in owned_instances:
+            terminate_instance.append(instance)
+
+    if len(terminate_instance) == 0:
+        msg = '''\
+종료할 인스턴스가 존재하지 않습니다. 👀
+
+콤마(,)로 구분하여 작성했는지 확인해주세요.
+자신 소유의 인스턴스가 맞는지 확인해주세요.\
+'''
+        say(msg)
+
+        return False
+
+    msg = f'''\
+{name[0]} 교육생의 인스턴스 삭제 요청이 있습니다.🔎 삭제 부탁드립니다!
+
+Instance ID : {terminate_instance}\
+'''
+    slack_client.app.client.chat_postMessage(
+        channel=manager_slack_id,
+        text=msg
+    )
+
+    msg = f'''\
+인스턴스 {terminate_instance}의 삭제 요청을 보냈습니다... 🗑️\
+'''
+    slack_client.app.client.chat_postMessage(
+        channel=slack_id,
+        text=msg
+    )
 
 
 @app.route('/slack/events', methods=['POST'])

@@ -511,3 +511,40 @@ class PSQLClient:
         fetched_data = self._execute_query(query)
 
         return fetched_data
+
+    def get_student_name(
+        self,
+        slack_id: str
+    ) -> Optional[tuple[str, int]]:
+        '''슬랙 유저의 이름 정보를 반환합니다.'''
+
+        query = '''
+            SELECT
+                name
+            FROM
+                student
+            WHERE
+                slack_id = %s
+            ;
+        '''
+
+        fetched_data = self._execute_query(query, (slack_id,))
+
+        if fetched_data:
+            return fetched_data[0]
+
+    def get_iam_user(self) -> Optional[list[tuple]]:
+        '''iam_user table에 있는 데이터를 추출합니다.'''
+
+        query = '''
+            SELECT
+                user_name
+                , user_id
+            FROM
+                iam_user
+            ;
+        '''
+
+        fetched_data = self._execute_query(query)
+
+        return fetched_data
