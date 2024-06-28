@@ -59,16 +59,17 @@ class PSQLClient:
 
         self._execute_query(query, (users_info,), many=True)
 
-    def get_track_and_student_id(
+    def get_student_info(
         self,
         slack_id: str
     ) -> Optional[tuple[str, int]]:
-        '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보를 반환합니다.'''
+        '''슬랙 유저의 트랙과 `student` 테이블의 ID 정보, 이름을 반환합니다.'''
 
         query = '''
             SELECT
                 track
                 , student_id
+                , name
             FROM
                 student
             WHERE
