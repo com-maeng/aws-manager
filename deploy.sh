@@ -20,4 +20,4 @@ pyenv activate deploy
 pip install -r requirements.txt
 
 # Deploy the service
-nohup gunicorn --workers 2 --bind 127.0.0.1:4202 app:app &
+nohup gunicorn --workers 2 --bind 127.0.0.1:4202 app:app > deploy.log 2>&1 &
