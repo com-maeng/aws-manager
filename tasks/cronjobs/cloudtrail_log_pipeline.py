@@ -86,9 +86,10 @@ if __name__ == '__main__':
 
     logs_to_insert = parsing_ec2_logs(total_logs)
 
-    if len(logs_to_insert) != 0:
-        psql_client.insert_into_cloudtrail_log(logs_to_insert)
+    if len(logs_to_insert) == 0:
         logging.info(
-            'AWS CloudTrail Log Data 적재 성공 | %s',
-            logs_to_insert
-        )
+            'AWS CloudTrail Log Data 적재 실패 | `logs_to_insert`: %s', logs_to_insert)
+        sys.exit(1)
+
+    psql_client.insert_into_cloudtrail_log(logs_to_insert)
+    logging.info('AWS CloudTrail Log Data 적재 성공 | %s', logs_to_insert)

@@ -43,11 +43,12 @@ class EC2Client:
 
         instance_state_dict = {}
 
-        for r in resp_dict['Reservations']:
-            instance_id = r['Instances'][0]['InstanceId']
-            state = r['Instances'][0]['State']['Name']
+        for reservation in resp_dict['Reservations']:
+            for instance in reservation['Instances']:
+                instance_id = instance['InstanceId']
+                state = instance['State']['Name']
 
-            instance_state_dict[instance_id] = state
+                instance_state_dict[instance_id] = state
 
         return instance_state_dict
 
@@ -108,8 +109,9 @@ class EC2Client:
         reservations = response['Reservations']
 
         for reservation in reservations:
-            instance_id = reservation['Instances'][0]['InstanceId']
-            instance_id_list.append(instance_id)
+            for instance in reservation['Instances']:
+                instance_id = instance['InstanceId']
+                instance_id_list.append(instance_id)
 
         return instance_id_list
 
