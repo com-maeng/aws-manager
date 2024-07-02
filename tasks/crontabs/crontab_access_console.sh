@@ -9,8 +9,8 @@ source ~/.zshrc
 
 pyenv activate 3.11.9/envs/deploy
 
-cd /home/hongju/aws-manager/tasks/cronjobs
+cd /Users/hongju/Documents/aws-manager/tasks/cronjobs
 
 python console_access_manager.py
  
-echo "접근 권한 부여 및 회수 shell 정상 작동 $(date)" >> cronjob_log.txt 
+echo "$(date) : 접근 권한 부여 및 회수 crontab 정상 작동 " 
