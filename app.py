@@ -344,9 +344,12 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
 def handle_policy_command(ack, command) -> bool:
     '''AWS 임시 콘솔 접근 부여 커맨드(/policy)를 처리합니다.'''
 
-    ack()
-
     slack_id = command['user_id']
+    msg = 'AWS 콘솔 접근 임시 권한을 부여하는 중입니다... 👀'
+
+    ack()
+    slack_client.send_dm(slack_id, msg)
+
     now = datetime.now(timezone('Asia/Seoul'))
 
     # 교육생 여부 체크
@@ -391,8 +394,8 @@ def handle_policy_command(ack, command) -> bool:
     if policy_reqeust_count[0][0] >= 4:
         msg = '''\
 오늘은 더이상 임시 콘솔 접근 권한을 요청할 수 없습니다.:melting_face:
-임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다. \
-'''
+임시 콘솔 접근 권한은 매일 15분씩 총 4번까지 가능합니다.\
+        '''
 
         slack_client.send_dm(slack_id, msg)
         logging.info(
@@ -415,9 +418,9 @@ def handle_policy_command(ack, command) -> bool:
             return False
 
         msg = '''\
-AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
-지금부터 15분간 AWS콘솔에 접근할 수 있습니다. \
-'''
+AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다 ✅
+지금부터 15분간 AWS 콘솔에 로그인하여 작업할 수 있습니다.\
+        '''
 
         slack_client.send_dm(slack_id, msg)
         psql_client.insert_slack_user_request_log(
@@ -439,9 +442,9 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다! 🚀
             return False
 
         msg = f'''\
-15분이 경과하여 콘솔 접근 권한이 회수되었습니다. :smiling_face_with_tear:
-⚠️ 오늘 콘솔 접근 권한 요청은 {4 - policy_reqeust_count[0][0]}번 남았습니다.\
-'''
+15분이 경과하여 콘솔 접근 권한이 회수되었습니다 👋
+오늘의 콘솔 접근 권한 요청은 총 _{policy_reqeust_count[0][0] - 1}번_ 남았습니다.\
+        '''
 
         slack_client.send_dm(slack_id, msg)
 
