@@ -9,10 +9,10 @@ source ~/.zshrc
 
 pyenv activate 3.11.9/envs/deploy
 
-cd /home/hongju/aws-manager/tasks/cronjobs
+cd /Users/hongju/Documents/aws-manager/tasks/cronjobs
  
 python cloudtrail_log_pipeline.py
 python quota_updater.py
 python instance_police.py
 
-echo "매일 5분마다 돌아가는 shell 정상 작동 $(date)" >> cronjob_log.txt 
+echo "$(date) : 매일 5분마다 돌아가는 crontab 정상 작동" 
