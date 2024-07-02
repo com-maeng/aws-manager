@@ -443,7 +443,7 @@ AWS 콘솔 접근을 위한 임시 권한이 부여되었습니다 ✅
 
         msg = f'''\
 15분이 경과하여 콘솔 접근 권한이 회수되었습니다 👋
-오늘의 콘솔 접근 권한 요청은 총 _{policy_reqeust_count[0][0] - 1}번_ 남았습니다.\
+오늘의 콘솔 접근 권한 요청은 총 _{4 - policy_reqeust_count[0][0]}번_ 남았습니다.\
         '''
 
         slack_client.send_dm(slack_id, msg)
