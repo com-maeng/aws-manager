@@ -13,7 +13,7 @@ cd /Users/hongju/Documents/aws-manager/tasks/cronjobs
 
 args=("$@")
 
-for (( i=0; i<$#; i++)); do
-  python ${args[$i-1]}
+for (( i=1; i<=$#; i++)); do
+  python ${args[$i]}
 done
 
