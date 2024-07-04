@@ -54,9 +54,16 @@ if __name__ == "__main__":
     end_time = datetime.now(pytz.utc)
     start_time = end_time - timedelta(hours=1)
     owner_logs_to_insert = []
+    owner_logs_to_delete = []
 
     run_logs = cloudtrail_client.get_event_log_by_event_name(
         'RunInstances',
+        start_time,
+        end_time
+    )
+
+    terminate_logs = cloudtrail_client.get_event_log_by_event_name(
+        'TerminateInstances',
         start_time,
         end_time
     )
@@ -75,10 +82,13 @@ if __name__ == "__main__":
         sys.exit(0)
 
     instance_owned_info = ec2_run_log_parser(run_logs)
+    instance_terminate_info = ec2_run_log_parser(terminate_logs)
+
     iam_user_info_from_db = dict(
         psql_client.get_iam_user()
     )  # {user_name : user_id}
 
+    # 적재 정보
     for info in instance_owned_info:
         iam_name, instance_id = info
         owned_by = iam_user_info_from_db.get(iam_name)
@@ -86,9 +96,17 @@ if __name__ == "__main__":
         if owned_by:
             owner_logs_to_insert.append((owned_by, instance_id))
 
+    # 삭제 정보
+    for info in instance_terminate_info:
+        _, instance_id = info
+        owner_logs_to_delete.append((instance_id,))
+
+    if len(instance_terminate_info) != 0:
+        psql_client.delete_ownership_info(owner_logs_to_delete)
+        logging.info('Terminate된 인스턴스 데이터 삭제 성공')
+
     if len(owner_logs_to_insert) != 0:
         psql_client.insert_into_ownership_info(owner_logs_to_insert)
         logging.info(
-            '인스턴스 소유 데이터 적재 성공 | %s',
-            owner_logs_to_insert
+            '인스턴스 소유 데이터 적재 성공'
         )
