@@ -55,6 +55,7 @@ if __name__ == "__main__":
     start_time = end_time - timedelta(hours=1)
     owner_logs_to_insert = []
     owner_logs_to_delete = []
+    manager_iam = ['AWSManagerApp', 'YiHongju', 'KimYeongju']
 
     run_logs = cloudtrail_client.get_event_log_by_event_name(
         'RunInstances',
@@ -75,12 +76,6 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    if len(run_logs) == 0:
-        logging.info(
-            'AWS CloudTrail의 새로운 RunInstances Events가 없으므로 정상 종료됩니다.'
-        )
-        sys.exit(0)
-
     instance_owned_info = ec2_run_log_parser(run_logs)
     instance_terminate_info = ec2_run_log_parser(terminate_logs)
 
@@ -98,15 +93,16 @@ if __name__ == "__main__":
 
     # 삭제 정보
     for info in instance_terminate_info:
-        _, instance_id = info
-        owner_logs_to_delete.append((instance_id,))
-
-    if len(instance_terminate_info) != 0:
-        psql_client.delete_ownership_info(owner_logs_to_delete)
-        logging.info('Terminate된 인스턴스 데이터 삭제 성공')
+        iam_name, instance_id = info
+        if iam_name in manager_iam:
+            owner_logs_to_delete.append((instance_id,))
 
     if len(owner_logs_to_insert) != 0:
         psql_client.insert_into_ownership_info(owner_logs_to_insert)
         logging.info(
             '인스턴스 소유 데이터 적재 성공'
         )
+
+    if len(instance_terminate_info) != 0:
+        psql_client.delete_ownership_info(owner_logs_to_delete)
+        logging.info('Terminate된 인스턴스 데이터 삭제 성공')
