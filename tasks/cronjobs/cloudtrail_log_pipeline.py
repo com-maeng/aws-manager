@@ -40,9 +40,7 @@ def parsing_ec2_logs(
         for resource in log['Resources']:
             if resource['ResourceType'] == 'AWS::EC2::Instance':
                 instance_id = resource['ResourceName']
-                break
-
-        logs_list.append((instance_id, log_type, log_time))
+                logs_list.append((instance_id, log_type, log_time))
 
     return logs_list
 
@@ -72,17 +70,19 @@ if __name__ == '__main__':
         start_time,
         end_time
     )
+    terminate_logs = cloudtrail_client.get_event_log_by_event_name(
+        'TerminateInstances',
+        start_time,
+        end_time
+    )
 
     if (stop_logs and start_logs and run_logs) is None:
         logging.error(
-            'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다. | %s | %s | %s',
-            start_logs,
-            stop_logs,
-            run_logs
+            'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다.'
         )
         sys.exit(1)
 
-    total_logs = stop_logs + start_logs + run_logs
+    total_logs = stop_logs + start_logs + run_logs + terminate_logs
 
     logs_to_insert = parsing_ec2_logs(total_logs)
 
@@ -92,4 +92,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     psql_client.insert_into_cloudtrail_log(logs_to_insert)
-    logging.info('AWS CloudTrail Log Data 적재 성공 | %s', logs_to_insert)
+    logging.info('AWS CloudTrail Log Data 적재 성공')
