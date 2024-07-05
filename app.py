@@ -88,7 +88,7 @@ def handle_show_command(ack, command) -> bool:
         return False
 
     # 인스턴스 상태 조회
-    instance_info_dict = ec2_client.get_instance_state_and_name(
+    instance_info_dict = ec2_client.get_instance_info(
         user_owned_instance_list)
 
     if not instance_info_dict:
@@ -106,7 +106,8 @@ def handle_show_command(ack, command) -> bool:
 
     for k, v in instance_info_dict.items():
         instance_info_str_list.append(
-            f'- {k}(`{v["name"]}`): {v["instance_state"]}')
+            f'- `{v["name"]}` : {k} | {v["instance_state"]} | \
+Public IP Address - {v["public_ip_address"]} | Private IP Address - {v["private_ip_address"]}')
     msg += '\n'.join(instance_info_str_list)
 
     slack_client.send_dm(slack_id, msg)
@@ -168,7 +169,7 @@ def handle_stop_command(ack, command) -> bool:
         return False
 
     # 인스턴스 상태 조회
-    instance_info_dict = ec2_client.get_instance_state_and_name(
+    instance_info_dict = ec2_client.get_instance_info(
         user_owned_instance_list)
     if not instance_info_dict:
         msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
@@ -271,7 +272,7 @@ def handle_start_command(ack, command) -> bool:
         return False
 
     # 인스턴스 상태 조회
-    instance_info_dict = ec2_client.get_instance_state_and_name(
+    instance_info_dict = ec2_client.get_instance_info(
         user_owned_instance_list)
     if not instance_info_dict:
         msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
