@@ -22,11 +22,31 @@ class EC2Client:
             region_name='ap-northeast-2',
         )
 
-    def get_instance_state_and_name(
+    def get_instance_info(
         self,
         instance_ids: list[str]
     ) -> Optional[dict[str, dict[str, str]]]:
-        '''AWS API를 호출하여 인스턴스의 상태와 Name 태그 정보를 반환합니다.'''
+        '''AWS API를 호출하여 인스턴스 state, Name 태그 정보 등을 반환합니다.
+
+        Returns:
+          각 인스턴스에 대응되는 다양한 정보들이 key-value 형태로 저장됩니다.
+          예시는 아래와 같습니다.
+
+          {
+            'i-123456789': {
+                'instance_state': 'stopped',
+                'name': 'hongju-spark-master1',
+                'public_ip_address': '34.1.2.3',
+                'private_ip_address': '10.0.0.2'
+            },
+            'i-987651231': {
+                'instance_state': 'running',
+                'name': 'hongju-spark-master2',
+                'public_ip_address': '34.1.2.4',
+                'private_ip_address': '10.0.0.3'
+            }
+          }
+        '''
 
         try:
             resp_dict = self.client.describe_instances(
@@ -48,6 +68,8 @@ class EC2Client:
                 instance_id = instance['InstanceId']
                 state = instance['State']['Name']
                 name_tag_value = None
+                public_ip = None
+                private_ip = None
 
                 # 'Name' 태그 값 파싱
                 try:
@@ -58,9 +80,26 @@ class EC2Client:
                 except KeyError:
                     logging.info('인스턴스에 태그가 없음 (`Tags`): %s', instance.keys())
 
+                # Public IP 주소값 파싱
+                try:
+                    public_ip = instance['PublicIpAddress']
+                except KeyError:
+                    logging.info(
+                        '인스턴스에 Public IP 주소가 없음 (`Tags`): %s', instance.keys())
+
+                # Private IP 주소값 파싱
+                try:
+                    private_ip = instance['PrivateIpAddress']
+                except KeyError:
+                    logging.info(
+                        '인스턴스에 Private IP 주소가 없음 (`Tags`): %s', instance.keys())
+
+                # 파싱 정보 할당
                 instance_state_name_dict[instance_id] = {
                     'instance_state': state,
-                    'name': name_tag_value
+                    'name': name_tag_value,
+                    'public_ip_address': public_ip,
+                    'private_ip_address': private_ip
                 }
 
         return instance_state_name_dict
