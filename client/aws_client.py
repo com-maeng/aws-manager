@@ -22,11 +22,11 @@ class EC2Client:
             region_name='ap-northeast-2',
         )
 
-    def get_instance_state(
+    def get_instance_state_and_name(
         self,
         instance_ids: list[str]
-    ) -> Optional[dict[str, str]]:
-        '''AWS API를 호출하여 인스턴스의 상태를 반환합니다.'''
+    ) -> Optional[dict[str, dict[str, str]]]:
+        '''AWS API를 호출하여 인스턴스의 상태와 Name 태그 정보를 반환합니다.'''
 
         try:
             resp_dict = self.client.describe_instances(
@@ -34,23 +34,36 @@ class EC2Client:
             )
         except ClientError as e:
             logging.error(
-                '인스턴스 상태 정보 API 호출 실패 | 인스턴스 ID 목록: %s | %s',
+                '인스턴스 상태, Name 태그 정보 API 호출 실패: %s | 인스턴스 ID 목록: %s',
                 instance_ids,
                 e
             )
 
             return None
 
-        instance_state_dict = {}
+        instance_state_name_dict = {}
 
         for reservation in resp_dict['Reservations']:
             for instance in reservation['Instances']:
                 instance_id = instance['InstanceId']
                 state = instance['State']['Name']
+                name_tag_value = None
 
-                instance_state_dict[instance_id] = state
+                # 'Name' 태그 값 파싱
+                try:
+                    for tag in instance['Tags']:
+                        if 'Name' in tag.values():
+                            name_tag_value = tag['Value']
+                            break
+                except KeyError:
+                    logging.info('인스턴스에 태그가 없음 (`Tags`): %s', instance.keys())
 
-        return instance_state_dict
+                instance_state_name_dict[instance_id] = {
+                    'instance_state': state,
+                    'name': name_tag_value
+                }
+
+        return instance_state_name_dict
 
     def start_instance(
         self,
