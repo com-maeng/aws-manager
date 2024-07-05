@@ -88,10 +88,10 @@ def handle_show_command(ack, command) -> bool:
         return False
 
     # 인스턴스 상태 조회
-    instance_state_dict = ec2_client.get_instance_state(
+    instance_info_dict = ec2_client.get_instance_state_and_name(
         user_owned_instance_list)
 
-    if not instance_state_dict:
+    if not instance_info_dict:
         msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
 
         slack_client.send_dm(slack_id, msg)
@@ -101,11 +101,13 @@ def handle_show_command(ack, command) -> bool:
 
     # 상태 정보 메시지 전송, 로그 데이터 적재
     now = datetime.now(timezone('Asia/Seoul'))
-    instance_state_str_list = '\n'.join(
-        [f'- {k} : {v}' for k, v in instance_state_dict.items()]
-    )
-    msg = '조회된 인스턴스의 목록 📝\n\n'
-    msg += ''.join(instance_state_str_list)
+    msg = '조회된 인스턴스 목록 📝\n\n'
+    instance_info_str_list = []
+
+    for k, v in instance_info_dict.items():
+        instance_info_str_list.append(
+            f'- {k}(`{v["name"]}`): {v["instance_state"]}')
+    msg += '\n'.join(instance_info_str_list)
 
     slack_client.send_dm(slack_id, msg)
     logging.info('인스턴스 상태 조회 요청 | slack_id: %s', slack_id)
@@ -120,7 +122,7 @@ def handle_show_command(ack, command) -> bool:
 
 @slack_app.command('/stop')
 def handle_stop_command(ack, command) -> bool:
-    '''인스턴스 중지 커맨드(/stop)를 처리합니다.'''
+    '''인스턴스 중지 커맨드를(`/stop`) 처리합니다.'''
 
     slack_id = command['user_id']
     msg = '인스턴스를 중지하는 중입니다... 😴'
@@ -131,70 +133,72 @@ def handle_stop_command(ack, command) -> bool:
     # 교육생 여부 및 트랙 체크
     try:
         track, student_id = psql_client.get_track_and_student_id(slack_id)
-
         assert track == 'DE'
     except TypeError as e:
         msg = '이어드림스쿨 4기 교육생이 아니면 인스턴스를 중지할 수 없습니다.'
-
         slack_client.send_dm(slack_id, msg)
+
         logging.info(
             '교육생이 아닌 슬랙 유저의 `/stop` 요청 | 슬랙 ID: %s | %s',
             slack_id,
             e
         )
-
         return False
     except AssertionError as e:
         msg = '현재는 DE 트랙 교육생이 아니면 인스턴스를 중지할 수 없습니다.'
-
         slack_client.send_dm(slack_id, msg)
+
         logging.info(
             'DE 트랙 외 교육생의 `/stop` 요청 | 슬랙 ID: %s | %s',
             slack_id,
             e
         )
-
         return False
 
     # 소유 중인 인스턴스 조회
-    instance_id_list = psql_client.get_user_owned_instance(student_id)
-
-    if not instance_id_list:
+    user_owned_instance_list = psql_client.get_user_owned_instance(student_id)
+    if not user_owned_instance_list:
         msg = '현재 소유 중인 인스턴스가 없습니다.'
-
         slack_client.send_dm(slack_id, msg)
+
         logging.info(
             '소유 중인 인스턴스가 없는 사용자의 `/stop` 요청 | 슬랙 ID: %s',
             slack_id
         )
+        return False
 
+    # 인스턴스 상태 조회
+    instance_info_dict = ec2_client.get_instance_state_and_name(
+        user_owned_instance_list)
+    if not instance_info_dict:
+        msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
+        slack_client.send_dm(slack_id, msg)
+
+        logging.error('인스턴스 상태 조회 실패 | 인스턴스 ID: %s', user_owned_instance_list)
         return False
 
     # `stopped` 상태로 만들 인스턴스가 하나라도 있는지 확인
-    instance_state_dict = ec2_client.get_instance_state(instance_id_list)
-    state_values = instance_state_dict.values()
+    state_values = []
+    for single_info_dict in instance_info_dict.values():
+        state_values.append(single_info_dict['instance_state'])
 
     if not any(value == 'running' for value in state_values):
         msg = '이미 모든 인스턴스가 `stopped` 상태입니다.'
-
         slack_client.send_dm(slack_id, msg)
-        logging.info(
-            '`stopped`로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/stop` 요청 | 인스턴스 상태: %s',
-            instance_state_dict
-        )
 
+        logging.info(
+            '`stopped`로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/stop` 요청 | 인스턴스 상태: %s', instance_info_dict)
         return False
 
     # 인스턴스 중지
-    if not ec2_client.stop_instance(instance_id_list):
+    if not ec2_client.stop_instance(user_owned_instance_list):
         msg = '알 수 없는 이유로 인스턴스 중지에 실패했습니다.'
-
         slack_client.send_dm(slack_id, msg)
-        logging.error('인스턴스 중지 실패 | 인스턴스 ID: %s', instance_id_list)
 
+        logging.error('인스턴스 중지 실패 | 인스턴스 ID: %s', user_owned_instance_list)
         return False
 
-    logging.info('인스턴스 중지 | 인스턴스 ID: %s', instance_id_list)
+    logging.info('인스턴스 중지 | 인스턴스 ID: %s', user_owned_instance_list)
 
     # 성공 메시지 전송, 로그 데이터 적재
     now = datetime.now(timezone('Asia/Seoul'))
@@ -255,37 +259,42 @@ def handle_start_command(ack, command) -> bool:
         return False
 
     # 소유 중인 인스턴스 조회
-    instance_id_list = psql_client.get_user_owned_instance(student_id)
-
-    if not instance_id_list:
+    user_owned_instance_list = psql_client.get_user_owned_instance(student_id)
+    if not user_owned_instance_list:
         msg = '현재 소유 중인 인스턴스가 없습니다.'
-
         slack_client.send_dm(slack_id, msg)
+
         logging.info(
             '소유 중인 인스턴스가 없는 사용자의 `/start` 요청 | 슬랙 ID: %s',
             slack_id
         )
-
         return False
 
-    # `running` 상태로 만들 인스턴스가 하나라도 있는지 확인
-    instance_state_dict = ec2_client.get_instance_state(instance_id_list)
-    state_values = instance_state_dict.values()
+    # 인스턴스 상태 조회
+    instance_info_dict = ec2_client.get_instance_state_and_name(
+        user_owned_instance_list)
+    if not instance_info_dict:
+        msg = '알 수 없는 이유로 인스턴스 상태 조회에 실패했습니다.'
+        slack_client.send_dm(slack_id, msg)
+
+        logging.error('인스턴스 상태 조회 실패 | 인스턴스 ID: %s', user_owned_instance_list)
+        return False
+
+    # `stopped` 상태로 만들 인스턴스가 하나라도 있는지 확인
+    state_values = []
+    for single_info_dict in instance_info_dict.values():
+        state_values.append(single_info_dict['instance_state'])
 
     if not any(value == 'stopped' for value in state_values):
         msg = '이미 모든 인스턴스가 `running` 상태입니다.'
-
         slack_client.send_dm(slack_id, msg)
-        logging.info(
-            '`running`으로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/start` 요청 | 인스턴스 상태: %s',
-            instance_state_dict
-        )
 
+        logging.info(
+            '`running`으로 상태를 변경할 수 있는 인스턴스가 없는 상황에서의 `/start` 요청 | 인스턴스 상태: %s', instance_info_dict)
         return False
 
     # 인스턴스 사용 할당량 초과 여부 확인
     remaining_tm = psql_client.get_remaining_usage_time(student_id)
-
     if remaining_tm == time.min:
         msg = '''\
 오늘의 인스턴스 사용 할당량을 모두 초과하였습니다.
@@ -294,22 +303,20 @@ def handle_start_command(ack, command) -> bool:
 - 평일 할당량: 6시간
 - 주말 할당량: 12시간\
        '''
-
         slack_client.send_dm(slack_id, msg)
+
         logging.info(
             '인스턴스 사용 할당량 초과 상태에서 `/start` 요청 | 슬랙 ID: %s',
             slack_id
         )
-
         return False
 
     # 인스턴스 시작
-    if not ec2_client.start_instance(instance_id_list):
+    if not ec2_client.start_instance(user_owned_instance_list):
         msg = '알 수 없는 이유로 인스턴스 시작에 실패했습니다.'
-
         slack_client.send_dm(slack_id, msg)
-        logging.error('인스턴스 시작 실패 | 인스턴스 ID: %s', instance_id_list)
 
+        logging.error('인스턴스 시작 실패 | 인스턴스 ID: %s', user_owned_instance_list)
         return False
 
     # 성공 메시지 전송, 로그 데이터 적재
@@ -330,7 +337,8 @@ _인스턴스 할당량 초기화는 매일 자정에 진행됩니다._\
     '''
 
     slack_client.send_dm(slack_id, msg)
-    logging.info('인스턴스 시작 | 인스턴스 ID: %s', instance_id_list)
+    logging.info('인스턴스 시작 | 인스턴스 ID: %s', user_owned_instance_list)
+
     psql_client.insert_slack_user_request_log(
         student_id,
         'start',
