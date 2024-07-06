@@ -431,14 +431,11 @@ class PSQLClient:
             UPDATE
                 ec2_usage_quota
             SET
-                remaining_time = (
-                    SELECT
-                        usage_quota
-                    FROM
-                        temp_ec2_usage_quota
-                    WHERE
-                        temp_ec2_usage_quota.iam_user_id = ec2_usage_quota.iam_user_id
-                )
+                remaining_time = usage_quota
+            FROM
+                temp_ec2_usage_quota
+            WHERE
+                ec2_usage_quota.iam_user_id = temp_ec2_usage_quota.iam_user_id
             ;
         '''
         drop_query = '''
