@@ -160,22 +160,18 @@ class PSQLClient:
 
     def check_existed_instance_id(
         self,
-        instance_id_list: list[str]
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, ]]:
         '''주어진 인스턴스가 DB에 적재되어 있는지 확인합니다.'''
 
         query = '''
             SELECT
-                owner
-                , instance_id
+                instance_id
             FROM
                 ownership_info
-            WHERE
-                instance_id = ANY(%s)
             ;
         '''
 
-        fetched_data = self._execute_query(query, (instance_id_list,))
+        fetched_data = self._execute_query(query)
 
         return fetched_data
 
@@ -555,3 +551,4 @@ class PSQLClient:
 
         return fetched_data
 
+    
