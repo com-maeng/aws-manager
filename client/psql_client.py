@@ -555,18 +555,3 @@ class PSQLClient:
 
         return fetched_data
 
-    def delete_ownership_info(
-        self,
-        owner_info_delete_list: list[tuple[str]]
-    ) -> None:
-        '''이미 종료된 인스턴스 아이디들 소유 정보에서 삭제'''
-
-        query = '''
-            DELETE FROM
-                ownership_info
-            WHERE
-                instance_id = %s
-            ;
-        '''
-
-        self._execute_query(query, (owner_info_delete_list,), many=True)
