@@ -84,7 +84,17 @@ if __name__ == '__main__':
 
     total_logs = stop_logs + start_logs + run_logs + terminate_logs
 
-    logs_to_insert = parsing_ec2_logs(total_logs)
+    logs_to_insert_parsing = parsing_ec2_logs(total_logs)
+
+    get_instance_in_db = psql_client.check_existed_instance_id()
+    intance_id_in_db = [instance_id[0] for instance_id in get_instance_in_db]
+
+    for log in logs_to_insert_parsing:
+        instance_id = log[0]
+
+        if instance_id in intance_id_in_db:
+            logs_to_insert.append(log)
+
 
     if len(logs_to_insert) == 0:
         logging.info(
