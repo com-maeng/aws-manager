@@ -63,12 +63,6 @@ if __name__ == "__main__":
         end_time
     )
 
-    terminate_logs = cloudtrail_client.get_event_log_by_event_name(
-        'TerminateInstances',
-        start_time,
-        end_time
-    )
-
     if run_logs is None:
         logging.error(
             'AWS CloudTrail의 이벤트 조회 실패로 cron 작업이 비정상 종료됩니다. | %s ',
@@ -77,7 +71,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     instance_owned_info = ec2_run_log_parser(run_logs)
-    instance_terminate_info = ec2_run_log_parser(terminate_logs)
 
     iam_user_info_from_db = dict(
         psql_client.get_iam_user()
@@ -91,18 +84,8 @@ if __name__ == "__main__":
         if owned_by:
             owner_logs_to_insert.append((owned_by, instance_id))
 
-    # 삭제 정보
-    for info in instance_terminate_info:
-        iam_name, instance_id = info
-        if iam_name in manager_iam:
-            owner_logs_to_delete.append((instance_id,))
-
     if len(owner_logs_to_insert) != 0:
         psql_client.insert_into_ownership_info(owner_logs_to_insert)
         logging.info(
             '인스턴스 소유 데이터 적재 성공'
         )
-
-    if len(instance_terminate_info) != 0:
-        psql_client.delete_ownership_info(owner_logs_to_delete)
-        logging.info('Terminate된 인스턴스 데이터 삭제 성공')
